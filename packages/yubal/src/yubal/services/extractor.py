@@ -30,6 +30,20 @@ def _format_artists(artists: list[Artist]) -> str:
     return "; ".join(a.name for a in artists if a.name)
 
 
+def _parse_video_type(track: PlaylistTrack) -> VideoType | None:
+    """Parse the raw API videoType into a known member.
+
+    Returns None when the field is absent or holds a value YouTube Music has
+    added since this enum was written.
+    """
+    if not track.video_type:
+        return None
+    try:
+        return VideoType(track.video_type)
+    except ValueError:
+        return None
+
+
 def _upscale_thumbnail_url(url: str, size: int = 544) -> str:
     """Replace size parameters in a Google thumbnail URL to request a larger image.
 
@@ -266,7 +280,19 @@ class MetadataExtractorService:
                     e,
                 )
                 # Continue with partial results instead of failing entirely
-                metadata, skip_reason = self._create_fallback_metadata(track), None
+                fallback_type = self._determine_video_type(track)
+                metadata, skip_reason = (
+                    self._create_fallback_metadata(
+                        track,
+                        fallback_type,
+                        match_result=(
+                            MatchResult.MATCHED
+                            if fallback_type
+                            else MatchResult.UNOFFICIAL
+                        ),
+                    ),
+                    None,
+                )
 
             # Skip tracks that return None with a skip reason
             if metadata is None and skip_reason is not None:
@@ -548,27 +574,17 @@ class MetadataExtractorService:
         """
         video_type = self._determine_video_type(track)
 
-        # Skip tracks with unsupported video type
         if video_type is None:
-            # Check if UGC
-            is_ugc = False
-            if track.video_type:
-                try:
-                    is_ugc = VideoType(track.video_type) == VideoType.UGC
-                except ValueError:
-                    pass
+            # UGC uploads, podcast episodes, types YouTube Music added after
+            # this enum was written, and tracks where the API omits videoType
+            # entirely. All have a valid videoId and play fine — only their
+            # metadata is unreliable — so route them to _Unofficial/ rather
+            # than dropping them, gated on the user opting into UGC downloads.
+            metadata = self._create_unofficial_metadata(track)
+            if metadata is not None:
+                return metadata, None
 
-            # The API omits videoType for some tracks that still have a valid
-            # videoId and play fine. Most are user uploads with no tagging, so
-            # treat them like explicit UGC: extract when UGC downloads are on,
-            # skip otherwise.
-            if (is_ugc or not track.video_type) and self._download_ugc:
-                metadata = self._create_fallback_metadata(
-                    track, VideoType.UGC, match_result=MatchResult.UNOFFICIAL
-                )
-                if metadata is not None:
-                    return metadata, None
-
+            is_ugc = _parse_video_type(track) == VideoType.UGC
             return None, SkipReason.UGC if is_ugc else SkipReason.UNSUPPORTED_VIDEO_TYPE
 
         album_id = track.album.id if track.album else None
@@ -633,25 +649,19 @@ class MetadataExtractorService:
 
         Returns:
             VideoType enum value if supported, or None if missing/unsupported.
+            Callers route the None cases to ``_Unofficial/``.
         """
-        if not track.video_type:
-            logger.debug(
-                "Missing video type for track '%s'",
-                track.title,
-            )
-            return None
+        video_type = _parse_video_type(track)
 
-        try:
-            video_type = VideoType(track.video_type)
-        except ValueError:
+        if video_type is None:
             logger.debug(
-                "Unknown video type '%s' for track '%s'",
+                "Missing or unknown video type '%s' for track '%s'",
                 track.video_type,
                 track.title,
             )
             return None
 
-        # Only ATV, OMV, and OSM are supported
+        # Only ATV, OMV, and OSM carry album-shaped metadata we can trust
         if video_type not in SUPPORTED_VIDEO_TYPES:
             logger.debug(
                 "Unsupported video type '%s' for track '%s'",
@@ -955,10 +965,34 @@ class MetadataExtractorService:
             duration_seconds=track.duration_seconds,
         )
 
+    def _create_unofficial_metadata(self, track: PlaylistTrack) -> TrackMetadata | None:
+        """Build metadata for a track whose video type we cannot trust.
+
+        Covers UGC uploads, podcast episodes, unrecognised video types, and
+        tracks the API returns with no videoType at all. These are downloadable
+        but their metadata is not album-shaped, so they are routed to
+        ``_Unofficial/`` instead of the artist/album tree.
+
+        Args:
+            track: Playlist track to create metadata from.
+
+        Returns:
+            Unofficial track metadata, or None when UGC downloads are disabled
+            (the caller then reports the track as skipped).
+        """
+        if not self._download_ugc:
+            return None
+
+        return self._create_fallback_metadata(
+            track,
+            _parse_video_type(track),
+            match_result=MatchResult.UNOFFICIAL,
+        )
+
     def _create_fallback_metadata(
         self,
         track: PlaylistTrack,
-        video_type: VideoType | None = None,
+        video_type: VideoType | None,
         *,
         match_result: MatchResult = MatchResult.MATCHED,
     ) -> TrackMetadata | None:
@@ -978,32 +1012,27 @@ class MetadataExtractorService:
 
         Args:
             track: Playlist track to create fallback from.
-            video_type: Optional video type (determined if not provided).
+            video_type: Video type, or None when the API reported one we do
+                not recognise.
             match_result: How the track was matched — controls download routing.
 
         Returns:
-            Basic track metadata, or None if video type is unsupported.
+            Basic track metadata, or None if the track has no video ID.
         """
-        if video_type is None:
-            video_type = self._determine_video_type(track)
-
-        # Skip unsupported video types
-        # None means unknown/unsupported from _determine_video_type
-        # Allow UGC through when building unofficial metadata
-        allowed_types = SUPPORTED_VIDEO_TYPES | {VideoType.UGC}
-        if video_type is None or video_type not in allowed_types:
+        if not track.video_id:
             return None
 
         # Assign video ID based on track type
         if video_type == VideoType.ATV:
             omv_id = None
             atv_id = track.video_id
-        elif video_type == VideoType.UGC:
-            # UGC tracks: no official OMV/ATV, ID lives in source_video_id
-            omv_id = None
+        elif video_type in (VideoType.OMV, VideoType.OFFICIAL_SOURCE_MUSIC):
+            omv_id = track.video_id
             atv_id = None
         else:
-            omv_id = track.video_id
+            # UGC, podcasts, and unrecognised types have no official OMV/ATV
+            # counterpart — the ID lives in source_video_id
+            omv_id = None
             atv_id = None
 
         return TrackMetadata(

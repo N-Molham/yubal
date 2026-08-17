@@ -13,6 +13,7 @@ class VideoType(StrEnum):
     OMV = "MUSIC_VIDEO_TYPE_OMV"  # Official Music Video
     OFFICIAL_SOURCE_MUSIC = "MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC"  # Official source
     UGC = "MUSIC_VIDEO_TYPE_UGC"  # User Generated Content
+    PODCAST_EPISODE = "MUSIC_VIDEO_TYPE_PODCAST_EPISODE"  # Podcast episode
 
 
 class DownloadStatus(StrEnum):

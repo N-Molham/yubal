@@ -869,7 +869,7 @@ class TestMetadataExtractorService:
 
         # Track should be skipped due to missing video type
         assert len(tracks) == 0
-        assert "Missing video type" in caplog.text
+        assert "Missing or unknown video type" in caplog.text
 
     def test_extract_fuzzy_match_high_confidence(
         self,
@@ -1393,7 +1393,7 @@ class TestMetadataExtractorService:
 
         # Unknown type track should be skipped
         assert len(tracks) == 0
-        assert "Unknown video type" in caplog.text
+        assert "Missing or unknown video type" in caplog.text
 
     def test_extract_mixed_video_types_skips_unsupported(
         self,
@@ -1827,7 +1827,7 @@ class TestUGCDownload:
         assert tracks[0].match_result == MatchResult.UNOFFICIAL
         assert tracks[0].title == "Untagged Upload"
         assert tracks[0].source_video_id == "untyped123"
-        assert tracks[0].video_type == VideoType.UGC
+        assert tracks[0].video_type is None
         assert tracks[0].omv_video_id is None
         assert tracks[0].atv_video_id is None
         assert tracks[0].video_id == "untyped123"
@@ -1889,3 +1889,66 @@ class TestUGCDownload:
         assert tracks[0].video_type == VideoType.ATV
         assert tracks[1].match_result == MatchResult.UNOFFICIAL
         assert tracks[1].video_type == VideoType.UGC
+
+
+class TestUnsupportedVideoTypes:
+    """Tests for video types outside SUPPORTED_VIDEO_TYPES."""
+
+    def _make_playlist(self, video_type: str) -> Playlist:
+        return Playlist.model_validate(
+            {
+                "tracks": [
+                    {
+                        "videoId": "vid123",
+                        "videoType": video_type,
+                        "title": "Episode 1",
+                        "artists": [{"name": "Some Show"}],
+                        "thumbnails": [
+                            {"url": "https://t.jpg", "width": 120, "height": 90}
+                        ],
+                        "duration_seconds": 1800,
+                    }
+                ]
+            }
+        )
+
+    @pytest.mark.parametrize(
+        "video_type",
+        ["MUSIC_VIDEO_TYPE_PODCAST_EPISODE", "MUSIC_VIDEO_TYPE_UNKNOWN_FUTURE"],
+    )
+    def test_skipped_when_download_ugc_disabled(self, video_type: str) -> None:
+        """Unsupported types are skipped when the user has not opted into UGC."""
+        playlist = self._make_playlist(video_type)
+        mock = MockYTMusicClient(playlist=playlist, album=None, search_results=[])
+        service = MetadataExtractorService(mock, download_ugc=False)
+
+        metadata, skip_reason = service._extract_single_track(playlist.tracks[0])
+
+        assert metadata is None
+        assert skip_reason is SkipReason.UNSUPPORTED_VIDEO_TYPE
+
+    @pytest.mark.parametrize(
+        ("video_type", "expected_type"),
+        [
+            ("MUSIC_VIDEO_TYPE_PODCAST_EPISODE", VideoType.PODCAST_EPISODE),
+            ("MUSIC_VIDEO_TYPE_UNKNOWN_FUTURE", None),
+        ],
+    )
+    def test_routed_to_unofficial_when_download_ugc_enabled(
+        self, video_type: str, expected_type: VideoType | None
+    ) -> None:
+        """Unsupported types download to _Unofficial/ when UGC is enabled."""
+        playlist = self._make_playlist(video_type)
+        mock = MockYTMusicClient(playlist=playlist, album=None, search_results=[])
+        service = MetadataExtractorService(mock, download_ugc=True)
+
+        tracks = extract_all(service, "https://music.youtube.com/playlist?list=PLtest")
+
+        assert len(tracks) == 1
+        assert tracks[0].match_result == MatchResult.UNOFFICIAL
+        assert tracks[0].video_type == expected_type
+        # No official counterpart: the ID stays in source_video_id
+        assert tracks[0].source_video_id == "vid123"
+        assert tracks[0].video_id == "vid123"
+        assert tracks[0].omv_video_id is None
+        assert tracks[0].atv_video_id is None
