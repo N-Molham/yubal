@@ -262,7 +262,7 @@ class TestDownloadService:
         progress_list = list(service.download_tracks([sample_track]))
 
         with pytest.raises(ValidationError):
-            progress_list[0].current = 999
+            progress_list[0].current = 999  # ty: ignore[invalid-assignment]
 
     def test_download_tracks_continues_on_failure(
         self,
@@ -503,7 +503,7 @@ class TestDownloadResult:
         )
 
         with pytest.raises(ValidationError):
-            result.status = DownloadStatus.FAILED
+            result.status = DownloadStatus.FAILED  # ty: ignore[invalid-assignment]
 
 
 class TestDownloadConfig:

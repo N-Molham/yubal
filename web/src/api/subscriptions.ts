@@ -6,12 +6,10 @@ export type Subscription = components["schemas"]["SubscriptionResponse"];
 export type SchedulerStatus = components["schemas"]["SchedulerStatus"];
 
 type AddSubscriptionResult =
-  | { success: true; id: string }
-  | { success: false; error: string };
+  { success: true; id: string } | { success: false; error: string };
 
 type SyncResult =
-  | { success: true; jobIds: string[] }
-  | { success: false; error: string };
+  { success: true; jobIds: string[] } | { success: false; error: string };
 
 // --- Subscriptions ---
 

@@ -110,7 +110,7 @@ class TestMetadataExtractorService:
         )
 
         with pytest.raises(ValidationError):
-            progress_list[0].current = 999
+            progress_list[0].current = 999  # ty: ignore[invalid-assignment]
 
     def test_extract_handles_missing_album(
         self,
