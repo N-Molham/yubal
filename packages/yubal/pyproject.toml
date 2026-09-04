@@ -11,11 +11,13 @@ dependencies = [
   "mediafile>=0.12.0",
   "httpx>=0.27.0",
   "unidecode>=1.3.0",
-  # Pin to 1.x for older CPU compatibility (X86_V2 requirement in 2.x)
-  "numpy<2.0",
-  # JS runtime required by yt-dlp for YouTube's EJS challenge solver
-  "deno>=2.0",
 ]
+# Note: yt-dlp can use a `deno` binary on PATH to solve YouTube's EJS
+# anti-bot challenges (see utils/_jsruntime.py's plain PATH-based lookup —
+# no Python import required). Not a pip dependency here — the API image's
+# entrypoint.sh fetches the raw binary into a persistent volume at first
+# boot instead, since it's an 80MB+ static binary bigger than most of this
+# package's actual dependencies combined.
 
 [project.urls]
 Homepage = "https://github.com/guillevc/yubal"
