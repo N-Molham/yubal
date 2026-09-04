@@ -100,6 +100,7 @@ class JobExecutor:
         max_items: int | None = None,
         source: JobSource = JobSource.MANUAL,
         subscription_id: UUID | None = None,
+        download_ugc: bool | None = None,
     ) -> Job | None:
         """Create a new job and start it if ready.
 
@@ -112,12 +113,14 @@ class JobExecutor:
             max_items: Maximum number of items to download (None for all).
             source: Source of the job (manual API call or scheduler).
             subscription_id: Optional subscription that triggered this job.
+            download_ugc: Per-job override for including non-music/UGC
+                content. None falls back to the instance-wide setting.
 
         Returns:
             The created Job, or None if queue is full.
         """
         result = self._job_store.create(
-            url, self._audio_format, max_items, source, subscription_id
+            url, self._audio_format, max_items, source, subscription_id, download_ugc
         )
         if result is None:
             return None
@@ -138,7 +141,9 @@ class JobExecutor:
             job: The job to start executing.
         """
         task = asyncio.create_task(
-            self._run_job(job.id, job.url, job.max_items, job.subscription_id),
+            self._run_job(
+                job.id, job.url, job.max_items, job.subscription_id, job.download_ugc
+            ),
             name=f"job-{job.id[:8]}",  # Helpful for debugging
         )
         self._background_tasks.add(task)
@@ -182,6 +187,7 @@ class JobExecutor:
         url: str,
         max_items: int | None = None,
         subscription_id: UUID | None = None,
+        download_ugc: bool | None = None,
     ) -> None:
         """Background task that runs the sync operation."""
         cancel_token = CancelToken()
@@ -239,7 +245,7 @@ class JobExecutor:
                     self._ytmusic_lyrics_fallback,
                     self._apply_replaygain,
                     self._ascii_filenames,
-                    self._download_ugc,
+                    download_ugc if download_ugc is not None else self._download_ugc,
                     self._cache_path,
                     self._audio_quality,
                 )

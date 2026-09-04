@@ -54,6 +54,14 @@ def meta_cmd(
             help="Path to cookies.txt for YouTube Music authentication.",
         ),
     ] = None,
+    download_ugc: Annotated[
+        bool,
+        typer.Option(
+            "--download-ugc",
+            help="Extract non-music/UGC videos too (title/uploader/year, "
+            "no album match).",
+        ),
+    ] = False,
 ) -> None:
     """Extract structured metadata from a YouTube Music URL.
 
@@ -76,7 +84,7 @@ def meta_cmd(
 
     try:
         client = YTMusicClient(cookies_path=cookies)
-        service = MetadataExtractorService(client)
+        service = MetadataExtractorService(client, download_ugc=download_ugc)
         state = ExtractionState()
 
         # Inform user about single track detection (early feedback)

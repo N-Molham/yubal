@@ -21,6 +21,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Content Info
+         * @description Get metadata for a YouTube Music URL.
+         *
+         *     Returns title, artist, kind, track count, year, and thumbnail
+         *     from a single API call without running the full extraction pipeline.
+         */
+        get: operations["get_content_info_api_info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs": {
         parameters: {
             query?: never;
@@ -440,6 +463,11 @@ export interface components {
              * @description Maximum number of tracks to download
              */
             max_items?: number | null;
+            /**
+             * Download Ugc
+             * @description Include non-music/UGC videos for this job. Defaults to the instance-wide YUBAL_DOWNLOAD_UGC setting when omitted.
+             */
+            download_ugc?: boolean | null;
         };
         /**
          * ErrorResponse
@@ -486,6 +514,11 @@ export interface components {
              * @default null
              */
             max_items: number | null;
+            /**
+             * Download Ugc
+             * @default null
+             */
+            download_ugc: boolean | null;
             /**
              * Subscription Id
              * @default null
@@ -999,6 +1032,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    get_content_info_api_info_get: {
+        parameters: {
+            query: {
+                /** @description YouTube Music URL (playlist, album, or track) */
+                url: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

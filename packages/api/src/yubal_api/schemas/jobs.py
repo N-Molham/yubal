@@ -47,6 +47,11 @@ class CreateJobRequest(BaseModel):
         le=10000,
         description="Maximum number of tracks to download",
     )
+    download_ugc: bool | None = Field(
+        default=None,
+        description="Include non-music/UGC videos for this job. "
+        "Defaults to the instance-wide YUBAL_DOWNLOAD_UGC setting when omitted.",
+    )
 
 
 class JobsResponse(BaseModel):

@@ -80,6 +80,14 @@ def download_cmd(
             help="Transliterate unicode to ASCII in filenames.",
         ),
     ] = False,
+    download_ugc: Annotated[
+        bool,
+        typer.Option(
+            "--download-ugc",
+            help="Download non-music/UGC videos too, to _Unofficial/ "
+            "(title/uploader/year, no album match).",
+        ),
+    ] = False,
 ) -> None:
     """Download tracks from a YouTube Music URL.
 
@@ -117,6 +125,7 @@ def download_cmd(
                 quality=quality,
                 quiet=True,
                 ascii_filenames=ascii_filenames,
+                download_ugc=download_ugc,
             ),
             generate_m3u=not no_m3u,
             save_cover=not no_cover,
