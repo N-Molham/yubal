@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from yubal.utils.filename import (
+    build_podcast_episode_path,
     build_track_path,
     build_unmatched_track_path,
     build_unofficial_track_path,
@@ -980,6 +981,64 @@ class TestBuildUnofficialTrackPath:
             artist="Artist",
             title="Song",
             video_id="abc123",
+        )
+        assert isinstance(result, Path)
+
+
+class TestBuildPodcastEpisodePath:
+    """Tests for build_podcast_episode_path function."""
+
+    def test_docstring_example(self) -> None:
+        result = build_podcast_episode_path(Path("/music"), "Some Show", "2024", "Ep 1")
+        assert result == Path("/music/_Podcasts/Some Show/2024 - Ep 1")
+
+    def test_path_structure(self) -> None:
+        result = build_podcast_episode_path(
+            base=Path("/music"),
+            channel="Jawed",
+            year="2005",
+            title="Me at the zoo",
+        )
+        parts = result.parts
+        assert parts[-3] == "_Podcasts"
+        assert parts[-2] == "Jawed"
+        assert parts[-1] == "2005 - Me at the zoo"
+
+    def test_omits_year_prefix_when_unknown(self) -> None:
+        result = build_podcast_episode_path(
+            base=Path("/music"),
+            channel="Some Channel",
+            year=None,
+            title="Episode Title",
+        )
+        assert result == Path("/music/_Podcasts/Some Channel/Episode Title")
+
+    def test_transliterates_components(self) -> None:
+        result = build_podcast_episode_path(
+            base=Path("/music"),
+            channel="Björk's Show",
+            year="2024",
+            title="Jóga episode",
+            ascii_filenames=True,
+        )
+        assert result == Path("/music/_Podcasts/Bjork's Show/2024 - Joga episode")
+
+    def test_empty_component_fallbacks(self) -> None:
+        result = build_podcast_episode_path(
+            base=Path("/music"),
+            channel="",
+            year=None,
+            title="",
+        )
+        assert "Unknown Channel" in str(result)
+        assert "Untitled Episode" in str(result)
+
+    def test_returns_path_object(self) -> None:
+        result = build_podcast_episode_path(
+            base=Path("/music"),
+            channel="Channel",
+            year="2024",
+            title="Title",
         )
         assert isinstance(result, Path)
 

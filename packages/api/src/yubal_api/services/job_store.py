@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from uuid import UUID
 
-from yubal import AudioCodec, PhaseStats
+from yubal import AudioCodec, PhaseStats, classify_source
 
 from yubal_api.domain.enums import JobSource, JobStatus
 from yubal_api.domain.job import ContentInfo, Job
@@ -69,6 +69,8 @@ class JobStore:
         max_items: int | None = None,
         source: JobSource = JobSource.MANUAL,
         subscription_id: UUID | None = None,
+        download_ugc: bool | None = None,
+        is_podcast: bool = False,
     ) -> tuple[Job, bool] | None:
         """Create a new job.
 
@@ -81,6 +83,10 @@ class JobStore:
             max_items: Maximum number of items to download (None for all).
             source: Source of the job (manual API call or scheduler).
             subscription_id: Optional subscription that triggered this job.
+            download_ugc: Per-job override for including non-music/UGC
+                content. None falls back to the instance-wide setting.
+            is_podcast: User choice to classify this as a podcast episode
+                instead of music. Never auto-detected.
 
         Returns:
             Tuple of (job, should_start_immediately), or None if queue is full.
@@ -95,6 +101,9 @@ class JobStore:
                 url=url,
                 audio_format=audio_format,
                 max_items=max_items,
+                download_ugc=download_ugc,
+                is_podcast=is_podcast,
+                platform=classify_source(url),
                 subscription_id=subscription_id,
                 source=source,
             )

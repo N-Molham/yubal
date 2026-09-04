@@ -98,12 +98,20 @@ export function useJobsState() {
     };
   }, []);
 
-  const startJob = useCallback(async (url: string, maxItems?: number) => {
-    const result = await createJob(url, maxItems);
-    if (!result.success) {
-      showErrorToast("Download failed", result.error);
-    }
-  }, []);
+  const startJob = useCallback(
+    async (
+      url: string,
+      maxItems?: number,
+      downloadUgc?: boolean,
+      isPodcast?: boolean,
+    ) => {
+      const result = await createJob(url, maxItems, downloadUgc, isPodcast);
+      if (!result.success) {
+        showErrorToast("Download failed", result.error);
+      }
+    },
+    [],
+  );
 
   const cancelJob = useCallback(async (jobId: string) => {
     try {

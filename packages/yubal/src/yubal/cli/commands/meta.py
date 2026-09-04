@@ -20,8 +20,10 @@ from yubal.cli.state import ExtractionState
 from yubal.client import YTMusicClient
 from yubal.exceptions import YubalError
 from yubal.models.enums import SkipReason
+from yubal.providers import get_provider
+from yubal.providers.soundcloud import SoundCloudProvider
 from yubal.services import MetadataExtractorService
-from yubal.utils.url import is_single_track_url
+from yubal.services.soundcloud_extractor import SoundCloudExtractorService
 
 logger = logging.getLogger("yubal")
 
@@ -54,6 +56,14 @@ def meta_cmd(
             help="Path to cookies.txt for YouTube Music authentication.",
         ),
     ] = None,
+    download_ugc: Annotated[
+        bool,
+        typer.Option(
+            "--download-ugc",
+            help="Extract non-music/UGC videos too (title/uploader/year, "
+            "no album match).",
+        ),
+    ] = False,
 ) -> None:
     """Extract structured metadata from a YouTube Music URL.
 
@@ -75,12 +85,18 @@ def meta_cmd(
     setup_logging(verbose=verbose, console=console)
 
     try:
-        client = YTMusicClient(cookies_path=cookies)
-        service = MetadataExtractorService(client)
+        provider = get_provider(url)
+        is_soundcloud = isinstance(provider, SoundCloudProvider)
+        if is_soundcloud:
+            service = SoundCloudExtractorService()
+        else:
+            client = YTMusicClient(cookies_path=cookies)
+            service = MetadataExtractorService(client, download_ugc=download_ugc)
         state = ExtractionState()
 
         # Inform user about single track detection (early feedback)
-        if is_single_track_url(url):
+        match = provider.match(url) if provider else None
+        if match and match.kind == "track":
             console.print("[cyan]Detected single track[/cyan]")
 
         # Unified extraction API handles all URL types

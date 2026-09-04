@@ -21,6 +21,7 @@ from yubal import (
     PlaylistDownloadConfig,
     PlaylistProgress,
     TrackMetadata,
+    classify_source,
     create_playlist_downloader,
 )
 from yubal.models.enums import ContentKind
@@ -157,6 +158,7 @@ def build_content_info(
         audio_codec=audio_format.upper(),
         audio_bitrate=None,  # Set after first successful download
         kind=playlist.kind,
+        platform=classify_source(url),
     )
 
 
@@ -181,6 +183,7 @@ def build_early_content_info(
         audio_codec=audio_format.upper(),
         audio_bitrate=None,
         kind=playlist.kind,
+        platform=classify_source(url),
     )
 
 
@@ -277,6 +280,7 @@ class SyncService:
     download_ugc: bool = False
     cache_path: Path | None = None
     audio_quality: int = 0
+    is_podcast: bool = False
     _codec: AudioCodec = field(init=False)
 
     def __post_init__(self) -> None:
@@ -321,6 +325,7 @@ class SyncService:
             download_ugc=self.download_ugc,
             cache_path=self.cache_path,
             audio_quality=self.audio_quality,
+            is_podcast=self.is_podcast,
         )
         return workflow.execute()
 
@@ -353,6 +358,7 @@ class _SyncWorkflow:
     download_ugc: bool
     cache_path: Path | None
     audio_quality: int
+    is_podcast: bool = False
 
     # Workflow state
     content_info: ContentInfo | None = field(default=None, init=False)
@@ -403,6 +409,9 @@ class _SyncWorkflow:
                 ytmusic_lyrics_fallback=self.ytmusic_lyrics_fallback,
                 ascii_filenames=self.ascii_filenames,
                 download_ugc=self.download_ugc,
+                content_kind_override=(
+                    ContentKind.PODCAST_EPISODE if self.is_podcast else None
+                ),
             ),
             generate_m3u=True,
             save_cover=True,
@@ -564,6 +573,13 @@ class _SyncWorkflow:
             )
 
         destination = self._determine_destination(result)
+
+        # content_info.kind was captured during extraction, before
+        # PlaylistDownloadService applies the podcast override (which
+        # happens after extraction, once it knows there's anything to
+        # download) — resync from the downloader's final playlist_info.
+        if self.content_info is not None:
+            self.content_info.kind = result.playlist_info.kind
 
         self._emit(ProgressStep.COMPLETED, f"Sync complete: {destination}", 100.0)
 

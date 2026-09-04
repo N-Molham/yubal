@@ -211,6 +211,51 @@ def build_unmatched_track_path(
     )
 
 
+def build_podcast_episode_path(
+    base: Path,
+    channel: str,
+    year: str | None,
+    title: str,
+    *,
+    ascii_filenames: bool = False,
+) -> Path:
+    """Build a filesystem path for a podcast episode.
+
+    Path structure: base/_Podcasts/Channel/YEAR - Episode Title
+    When year is unknown: base/_Podcasts/Channel/Episode Title
+
+    Year-only, not a full date: yt-dlp/ytmusicapi's UGC fallback path only
+    exposes upload year for this content, not a full date. Multiple
+    same-year episodes still get distinct filenames since titles differ.
+
+    Args:
+        base: Base directory for downloads.
+        channel: Channel/show name.
+        year: Upload year (or None for unknown).
+        title: Episode title.
+        ascii_filenames: If True, transliterate unicode to ASCII.
+
+    Returns:
+        Full path to the episode file (without extension).
+
+    Example:
+        >>> build_podcast_episode_path(Path("/music"), "Some Show", "2024", "Ep 1")
+        PosixPath('/music/_Podcasts/Some Show/2024 - Ep 1')
+    """
+    safe_channel = (
+        clean_filename(channel, ascii_filenames=ascii_filenames) or "Unknown Channel"
+    )
+    safe_channel = _limit_path_component(safe_channel)
+    safe_title = (
+        clean_filename(title, ascii_filenames=ascii_filenames) or "Untitled Episode"
+    )
+
+    episode_name = f"{year} - {safe_title}" if year else safe_title
+    episode_name = _limit_path_component(episode_name)
+
+    return base / "_Podcasts" / safe_channel / episode_name
+
+
 def build_unofficial_track_path(
     base: Path,
     artist: str,

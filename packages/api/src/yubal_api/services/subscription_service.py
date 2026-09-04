@@ -8,8 +8,10 @@ from yubal import (
     AuthenticationRequiredError,
     PlaylistNotFoundError,
     PlaylistParseError,
+    Source,
     UnsupportedPlaylistError,
     UpstreamAPIError,
+    classify_source,
 )
 
 from yubal_api.api.exceptions import (
@@ -55,7 +57,12 @@ class SubscriptionService:
             raise SubscriptionNotFoundError(subscription_id)
         return sub
 
-    def create(self, url: str, max_items: int | None = None) -> Subscription:
+    def create(
+        self,
+        url: str,
+        max_items: int | None = None,
+        is_podcast: bool = False,
+    ) -> Subscription:
         existing = self._repository.get_by_url(url)
         if existing is not None:
             raise SubscriptionConflictError(
@@ -82,6 +89,8 @@ class SubscriptionService:
             url=url,
             name=metadata.title,
             thumbnail_url=metadata.thumbnail_url,
+            platform=classify_source(url) or Source.YOUTUBE_MUSIC,
+            is_podcast=is_podcast,
             enabled=True,
             max_items=max_items,
             created_at=datetime.now(UTC),

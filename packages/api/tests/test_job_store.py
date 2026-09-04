@@ -87,6 +87,23 @@ class TestJobLifecycle:
         job, _ = result
         assert job.max_items == 5
 
+    def test_create_with_download_ugc_override(self, store: JobStore) -> None:
+        """Created job should store an explicit download_ugc override."""
+        result = store.create(
+            "https://music.youtube.com/playlist?list=PLtest",
+            download_ugc=True,
+        )
+        assert result is not None
+        job, _ = result
+        assert job.download_ugc is True
+
+    def test_create_defaults_download_ugc_to_none(self, store: JobStore) -> None:
+        """download_ugc should default to None (defer to instance-wide setting)."""
+        result = store.create("https://music.youtube.com/playlist?list=PLtest")
+        assert result is not None
+        job, _ = result
+        assert job.download_ugc is None
+
     def test_create_defaults_to_manual_source(self, store: JobStore) -> None:
         """Created job should default to MANUAL source when not specified."""
         result = store.create("https://music.youtube.com/playlist?list=PLtest")

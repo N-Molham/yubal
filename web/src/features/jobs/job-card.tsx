@@ -1,6 +1,7 @@
 import type { Job, JobStatus } from "@/api/jobs";
 import { formatDateTime } from "@/lib/format";
 import { isActive, isFinished, isRunning } from "@/lib/job-status";
+import { platformLabel } from "@/lib/platform";
 import {
   Button,
   buttonVariants,
@@ -132,6 +133,7 @@ function ContentInfo({
   audioBitrate,
   showBitrate,
   kind,
+  platform,
   source,
   createdAt,
 }: {
@@ -142,10 +144,12 @@ function ContentInfo({
   audioCodec: string | null;
   audioBitrate: number | null;
   showBitrate: boolean;
-  kind: "playlist" | "album" | "track" | null;
+  kind: "playlist" | "album" | "track" | "podcast_episode" | null;
+  platform: "youtube_music" | "youtube" | "soundcloud" | null;
   source: "manual" | "scheduler";
   createdAt: string | undefined;
 }) {
+  const platformText = platformLabel(platform);
   return (
     <div className="min-w-0">
       <div className="flex flex-col gap-1">
@@ -177,7 +181,14 @@ function ContentInfo({
         )}
         {kind && (
           <JobChip variant={kind}>
-            <span className="capitalize">{kind}</span>
+            <span className="capitalize">
+              {kind === "podcast_episode" ? "Podcast" : kind}
+            </span>
+          </JobChip>
+        )}
+        {platformText && (
+          <JobChip variant="flat" className="max-md:hidden">
+            {platformText}
           </JobChip>
         )}
         {audioCodec && (
@@ -224,6 +235,7 @@ export function JobCard({ job, onCancel, onDelete }: Props) {
               audioBitrate={content_info.audio_bitrate ?? null}
               showBitrate={isJobFinished}
               kind={content_info.kind ?? null}
+              platform={content_info.platform ?? null}
               source={job.source}
               createdAt={job.created_at}
             />

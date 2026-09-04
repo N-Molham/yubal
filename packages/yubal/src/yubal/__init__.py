@@ -51,6 +51,7 @@ from yubal.models.enums import (
     DownloadStatus,
     MatchResult,
     SkipReason,
+    Source,
     VideoType,
 )
 from yubal.models.progress import DownloadProgress, ExtractProgress, PlaylistProgress
@@ -60,10 +61,11 @@ from yubal.models.results import (
     PlaylistDownloadResult,
 )
 from yubal.models.track import PlaylistInfo, TrackMetadata
+from yubal.providers import classify_source, is_supported_url
 from yubal.services import MetadataExtractorService, PlaylistDownloadService
 from yubal.services.download_service import DownloadService as _DownloadService
 from yubal.utils import cleanup_part_files, clear_cover_cache, fetch_cover
-from yubal.utils.url import is_single_track_url, is_supported_url, parse_playlist_id
+from yubal.utils.url import is_single_track_url, parse_playlist_id
 
 
 def create_extractor(
@@ -217,6 +219,7 @@ __all__ = [
     "PlaylistParseError",
     "PlaylistProgress",
     "SkipReason",
+    "Source",
     "TrackMetadata",
     "TrackNotFoundError",
     "TrackParseError",
@@ -224,6 +227,7 @@ __all__ = [
     "UpstreamAPIError",
     "VideoType",
     "YubalError",
+    "classify_source",
     "cleanup_part_files",
     "clear_cover_cache",
     "create_downloader",

@@ -1,4 +1,4 @@
-import { isYouTubeMediaUrl } from "@/lib/youtube";
+import { isYouTubeMediaUrl } from "@/lib/media-url";
 
 const SIZES = [16, 32, 48, 128] as const;
 

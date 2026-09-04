@@ -1,4 +1,4 @@
-import { YOUTUBE_URL_PATTERN } from "@/lib/url";
+import { isValidUrl } from "@/lib/url";
 import { CloseButton, FieldError, InputGroup, TextField } from "@heroui/react";
 import { LinkIcon } from "lucide-react";
 
@@ -15,7 +15,7 @@ export function UrlInput({
   disabled,
   placeholder = "Album or playlist URL",
 }: Props) {
-  const isValid = value === "" || YOUTUBE_URL_PATTERN.test(value);
+  const isValid = value === "" || isValidUrl(value);
 
   return (
     <TextField
@@ -43,7 +43,7 @@ export function UrlInput({
           </InputGroup.Suffix>
         )}
       </InputGroup>
-      {!isValid && <FieldError>Enter a valid YouTube URL</FieldError>}
+      {!isValid && <FieldError>Enter a valid URL</FieldError>}
     </TextField>
   );
 }

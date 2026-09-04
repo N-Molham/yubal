@@ -39,6 +39,7 @@ class TrackMetadata(BaseModel):
     source_video_id: str = ""
     omv_video_id: str | None = None
     atv_video_id: str | None = None
+    download_url: str | None = None
     title: str
     artists: list[str]
     album: str

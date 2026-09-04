@@ -12,6 +12,8 @@ const jobChip = tv({
       playlist: "bg-secondary/15 text-secondary",
       track:
         "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300",
+      podcast_episode:
+        "bg-purple-500/15 text-purple-600 dark:bg-purple-500/20 dark:text-purple-300",
     },
   },
   defaultVariants: {

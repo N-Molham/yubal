@@ -1,5 +1,11 @@
 # Build frontend
-FROM oven/bun:1-alpine AS web-builder
+#
+# Pinned to $BUILDPLATFORM (the build host's arch), not the target platform:
+# bun's JIT crashes under QEMU emulation ("MemoryExhaustion" abort) on a
+# foreign-arch multi-platform build. Not a real cross-compile though — the
+# output is architecture-independent static JS/CSS/HTML, so building it once
+# natively and reusing it for every target platform is correct, not a hack.
+FROM --platform=$BUILDPLATFORM oven/bun:1-alpine AS web-builder
 
 ARG VERSION=dev
 ARG COMMIT_SHA=dev
@@ -16,11 +22,9 @@ RUN VITE_VERSION=$VERSION \
     bun run build
 
 # Install Python dependencies
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS python-builder
+FROM ghcr.io/astral-sh/uv:python3.12-alpine AS python-builder
 
-# hadolint ignore=DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends git \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache git
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
@@ -28,51 +32,32 @@ COPY packages/ ./packages/
 RUN uv sync --package yubal-api --no-dev --frozen --no-cache --no-editable
 
 # Final runtime image
-FROM python:3.12-slim-bookworm
-
-ARG TARGETARCH
-ARG RSGAIN_VERSION=3.6
+FROM python:3.12-alpine
 
 WORKDIR /app
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install runtime dependencies in a single layer:
-#   1. ffmpeg (static binary)
-#   2. rsgain (ReplayGain tagger, amd64 only)
-#   3. Cleanup temp packages
-#   4. Create non-root user
-# hadolint ignore=DL3008
+# Install runtime dependencies, then create the non-root user.
+#
+# ffmpeg, deno, and rsgain are NOT baked in here — entrypoint.sh fetches
+# them into /app/config/bin/ (a persistent volume mount) on first boot
+# instead. That trades a slower first start for a much smaller image:
+#   - ffmpeg/deno are 80MB+ static binaries each, bigger than everything
+#     else in this image combined.
+#   - rsgain's own Alpine package (`apk add rsgain`) links against a full
+#     shared ffmpeg build transitively — pulls in ~90MB of libav*/codec
+#     packages, defeating the point of fetching a *minimal* ffmpeg above.
+#     Its own generic-Linux release (a 5MB static-ish binary, amd64 only —
+#     matching the original Dockerfile's own amd64-only scope, not a new
+#     restriction) avoids that entirely.
+# curl/tar/xz/unzip stay installed (not removed after) because
+# entrypoint.sh needs them at runtime to do these fetches.
 RUN set -eux \
-    # --- Runtime/setup deps ---
-    && apt-get update \
-    && apt-get install -y --no-install-recommends curl xz-utils ca-certificates gosu \
+    # bash: entrypoint.sh's shebang. su-exec: gosu-equivalent, Alpine-native.
+    && apk add --no-cache curl tar xz unzip ca-certificates bash su-exec \
     #
-    # --- ffmpeg (static) ---
-    && curl -fsSL --retry 3 --retry-delay 5 -o /tmp/ffmpeg.tar.xz \
-       "https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-${TARGETARCH}-static.tar.xz" \
-    && tar -xJf /tmp/ffmpeg.tar.xz --strip-components=1 -C /usr/local/bin/ \
-       --wildcards '*/ffmpeg' '*/ffprobe' \
-    && rm /tmp/ffmpeg.tar.xz \
-    #
-    # --- rsgain (amd64 only) ---
-    && if [ "$TARGETARCH" = "amd64" ]; then \
-         curl -fsSL --retry 3 --retry-delay 5 -o /tmp/rsgain.deb \
-           "https://github.com/complexlogic/rsgain/releases/download/v${RSGAIN_VERSION}/rsgain_${RSGAIN_VERSION}_amd64.deb" \
-         && (dpkg -i /tmp/rsgain.deb || apt-get install -y -f --no-install-recommends) \
-         && rm /tmp/rsgain.deb; \
-       fi \
-    #
-    # --- gosu (for entrypoint privilege drop) ---
-    && gosu nobody true \
-    #
-    # --- Cleanup ---
-    && apt-get purge -y curl xz-utils \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/* \
-    #
-    # --- Non-root user ---
-    && groupadd -g 1000 yubal \
-    && useradd -u 1000 -g yubal -d /app -s /sbin/nologin yubal
+    # --- Non-root user (Alpine's busybox addgroup/adduser, not groupadd/useradd) ---
+    && addgroup -g 1000 yubal \
+    && adduser -D -H -u 1000 -G yubal -h /app -s /sbin/nologin yubal
 
 # Copy built artifacts
 COPY --from=python-builder --chown=yubal:yubal /app/.venv /app/.venv
@@ -80,7 +65,7 @@ COPY --from=web-builder --chown=yubal:yubal /app/web/dist ./web/dist
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-ENV PATH="/app/.venv/bin:$PATH" \
+ENV PATH="/app/.venv/bin:/app/config/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     YUBAL_ROOT=/app \
     YUBAL_HOST=0.0.0.0 \

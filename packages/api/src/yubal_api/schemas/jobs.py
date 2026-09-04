@@ -2,8 +2,8 @@
 
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, Field, WithJsonSchema
-from yubal import is_supported_url
+from pydantic import AfterValidator, BaseModel, Field, WithJsonSchema, model_validator
+from yubal import Source, classify_source, is_supported_url
 
 from yubal_api.domain.job import Job
 
@@ -47,6 +47,26 @@ class CreateJobRequest(BaseModel):
         le=10000,
         description="Maximum number of tracks to download",
     )
+    download_ugc: bool | None = Field(
+        default=None,
+        description="Include non-music/UGC videos for this job. "
+        "Defaults to the instance-wide YUBAL_DOWNLOAD_UGC setting when omitted.",
+    )
+    is_podcast: bool = Field(
+        default=False,
+        description="Treat this as a podcast episode, not music. Only valid "
+        "for plain YouTube URLs (not YouTube Music or SoundCloud) — never "
+        "auto-detected, always an explicit user choice.",
+    )
+
+    @model_validator(mode="after")
+    def _podcast_requires_youtube_source(self) -> "CreateJobRequest":
+        if self.is_podcast and classify_source(self.url) != Source.YOUTUBE:
+            raise ValueError(
+                "is_podcast is only valid for plain YouTube URLs, not "
+                "YouTube Music or SoundCloud"
+            )
+        return self
 
 
 class JobsResponse(BaseModel):

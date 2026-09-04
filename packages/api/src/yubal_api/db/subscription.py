@@ -6,6 +6,7 @@ from typing import TypedDict
 from uuid import UUID, uuid4
 
 from sqlmodel import Field, SQLModel
+from yubal import Source
 
 
 class SubscriptionType(StrEnum):
@@ -36,5 +37,7 @@ class Subscription(SQLModel, table=True):
     enabled: bool = Field(default=True)
     max_items: int | None = Field(default=None, ge=1, le=10000)
     thumbnail_url: str | None = Field(default=None, max_length=2048)
+    platform: Source = Field(default=Source.YOUTUBE_MUSIC)
+    is_podcast: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_synced_at: datetime | None = Field(default=None)

@@ -48,3 +48,16 @@ For questions or troubleshooting, [open an issue](https://github.com/guillevc/yu
 If you're unsure whether a PR would be welcome, please open an issue first to discuss.
 
 > **Note:** I prefer to handle feature development myself until the project stabilizes. Feel free to fork for personal use, but please don't expect large PRs to be merged.
+
+## Adding a Source
+
+This fork generalized the download pipeline behind a `SourceProvider` protocol (`packages/yubal/src/yubal/providers/`) so a new yt-dlp-supported site doesn't need its own copy of the tagging/cover/M3U/ReplayGain pipeline — only URL matching and metadata extraction differ per source.
+
+To add one:
+
+1. Implement `SourceProvider` (`match(url)` → `UrlMatch | None`, `resolve_download_url(id)` → a URL yt-dlp can download) — see `providers/soundcloud.py` for a source with no catalog API, or `providers/youtube_music.py` for one that wraps an existing client.
+2. Register it in `providers/registry.py`.
+3. If the source has no catalog API (like SoundCloud), add an extractor mapping yt-dlp's own info-dict fields to `TrackMetadata` — see `services/soundcloud_extractor.py`. If it does (like YouTube Music via ytmusicapi), wire a client implementing the relevant protocol instead.
+4. Wire the new extractor/downloader pair into `PlaylistDownloadService`'s dispatch (`services/playlist_download_service.py`) — the same pattern SoundCloud follows: reuse the default YouTube Music pipeline unless the URL matches the new provider.
+
+See `docs/urls.md` for the URL shapes each existing provider matches.

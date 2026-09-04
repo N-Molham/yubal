@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from yubal.models.enums import ContentKind
+
 
 class AudioCodec(StrEnum):
     """Supported audio output codecs."""
@@ -39,6 +41,10 @@ class DownloadConfig:
         ytmusic_lyrics_fallback: When fetch_lyrics is enabled, fall back to
             YouTube Music's lyrics if lrclib.net has no match.
         ascii_filenames: Transliterate unicode to ASCII in filenames.
+        content_kind_override: User-chosen kind override (only
+            ContentKind.PODCAST_EPISODE is meaningful here) — replaces the
+            pipeline's own album/playlist/track classification for the
+            whole job. Never set automatically.
     """
 
     base_path: Path
@@ -49,6 +55,7 @@ class DownloadConfig:
     ytmusic_lyrics_fallback: bool = True
     ascii_filenames: bool = False
     download_ugc: bool = False
+    content_kind_override: ContentKind | None = None
 
 
 @dataclass(frozen=True)

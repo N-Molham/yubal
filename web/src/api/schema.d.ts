@@ -21,6 +21,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Content Info
+         * @description Get metadata for a YouTube Music URL.
+         *
+         *     Returns title, artist, kind, track count, year, and thumbnail
+         *     from a single API call without running the full extraction pipeline.
+         */
+        get: operations["get_content_info_api_info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs": {
         parameters: {
             query?: never;
@@ -388,13 +411,19 @@ export interface components {
             audio_bitrate: number | null;
             /** @default playlist */
             kind: components["schemas"]["ContentKind"];
+            /** @default null */
+            platform: components["schemas"]["Source"] | null;
         };
         /**
          * ContentKind
-         * @description Type of music content (album vs playlist vs track).
+         * @description Type of content (album vs playlist vs track vs podcast).
+         *
+         *     PODCAST_EPISODE is a user choice (see DownloadConfig.content_kind_override),
+         *     never auto-detected — it replaces ALBUM/PLAYLIST/TRACK classification for
+         *     the whole job when chosen, not a second axis on top of it.
          * @enum {string}
          */
-        ContentKind: "album" | "playlist" | "track";
+        ContentKind: "album" | "playlist" | "track" | "podcast_episode";
         /**
          * CookiesStatusResponse
          * @description Cookies status response model.
@@ -440,6 +469,17 @@ export interface components {
              * @description Maximum number of tracks to download
              */
             max_items?: number | null;
+            /**
+             * Download Ugc
+             * @description Include non-music/UGC videos for this job. Defaults to the instance-wide YUBAL_DOWNLOAD_UGC setting when omitted.
+             */
+            download_ugc?: boolean | null;
+            /**
+             * Is Podcast
+             * @description Treat this as a podcast episode, not music. Only valid for plain YouTube URLs (not YouTube Music or SoundCloud) — never auto-detected, always an explicit user choice.
+             * @default false
+             */
+            is_podcast: boolean;
         };
         /**
          * ErrorResponse
@@ -486,6 +526,18 @@ export interface components {
              * @default null
              */
             max_items: number | null;
+            /**
+             * Download Ugc
+             * @default null
+             */
+            download_ugc: boolean | null;
+            /**
+             * Is Podcast
+             * @default false
+             */
+            is_podcast: boolean;
+            /** @default null */
+            platform: components["schemas"]["Source"] | null;
             /**
              * Subscription Id
              * @default null
@@ -806,6 +858,18 @@ export interface components {
          */
         SkipReason: "file_exists" | "unsupported_video_type" | "ugc" | "no_video_id" | "region_unavailable";
         /**
+         * Source
+         * @description User-facing platform a piece of content came from.
+         *
+         *     A display/classification concept, not a 1:1 mirror of the provider
+         *     registry — YOUTUBE_MUSIC and YOUTUBE both route through the same
+         *     YouTubeMusicProvider/extraction pipeline (see providers.registry), but
+         *     users pasting a plain youtube.com link expect a "YouTube" label, not
+         *     "YouTube Music".
+         * @enum {string}
+         */
+        Source: "youtube_music" | "youtube" | "soundcloud";
+        /**
          * SubscriptionCounts
          * @description Subscription count statistics.
          */
@@ -827,6 +891,12 @@ export interface components {
             url: string;
             /** Max Items */
             max_items?: number | null;
+            /**
+             * Is Podcast
+             * @description Treat synced content as podcast episodes, not music. Only valid for plain YouTube URLs (not YouTube Music or SoundCloud).
+             * @default false
+             */
+            is_podcast: boolean;
         };
         /**
          * SubscriptionListResponse
@@ -863,6 +933,9 @@ export interface components {
              * Format: uri
              */
             thumbnail_url?: string | null;
+            platform: components["schemas"]["Source"];
+            /** Is Podcast */
+            is_podcast: boolean;
             /**
              * Created At
              * Format: date-time
@@ -999,6 +1072,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    get_content_info_api_info_get: {
+        parameters: {
+            query: {
+                /** @description YouTube Music URL (playlist, album, or track) */
+                url: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

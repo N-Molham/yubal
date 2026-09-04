@@ -8,7 +8,7 @@ services:
     user: 1000:1000
     environment:
       YUBAL_PORT: 8000
-      YUBAL_TZ: Europe/Madrid
+      YUBAL_TZ: Australia/Melbourne
     ports:
       - 8000:8000
     volumes:

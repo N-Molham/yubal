@@ -69,8 +69,29 @@ class MatchResult(StrEnum):
 
 
 class ContentKind(StrEnum):
-    """Type of music content (album vs playlist vs track)."""
+    """Type of content (album vs playlist vs track vs podcast).
+
+    PODCAST_EPISODE is a user choice (see DownloadConfig.content_kind_override),
+    never auto-detected — it replaces ALBUM/PLAYLIST/TRACK classification for
+    the whole job when chosen, not a second axis on top of it.
+    """
 
     ALBUM = "album"
     PLAYLIST = "playlist"
     TRACK = "track"
+    PODCAST_EPISODE = "podcast_episode"
+
+
+class Source(StrEnum):
+    """User-facing platform a piece of content came from.
+
+    A display/classification concept, not a 1:1 mirror of the provider
+    registry — YOUTUBE_MUSIC and YOUTUBE both route through the same
+    YouTubeMusicProvider/extraction pipeline (see providers.registry), but
+    users pasting a plain youtube.com link expect a "YouTube" label, not
+    "YouTube Music".
+    """
+
+    YOUTUBE_MUSIC = "youtube_music"
+    YOUTUBE = "youtube"
+    SOUNDCLOUD = "soundcloud"

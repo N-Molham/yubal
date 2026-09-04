@@ -213,6 +213,112 @@ class TestDownloadTrack:
         mock_extractor.extract.assert_called_once()
 
 
+class TestPodcastKindOverride:
+    """Tests for content_kind_override=PODCAST_EPISODE rewriting playlist_info."""
+
+    def test_podcast_override_rewrites_playlist_kind(
+        self,
+        single_track_metadata: TrackMetadata,
+        single_track_playlist_info: PlaylistInfo,
+        tmp_path: Path,
+    ) -> None:
+        """Extraction classifies as PLAYLIST/TRACK as usual; podcast override
+        rewrites it before download/compose/normalize see it."""
+        config = PlaylistDownloadConfig(
+            download=DownloadConfig(
+                base_path=tmp_path,
+                content_kind_override=ContentKind.PODCAST_EPISODE,
+            ),
+            generate_m3u=False,
+            save_cover=False,
+            apply_replaygain=False,
+        )
+
+        extract_progress = ExtractProgress(
+            current=1,
+            total=1,
+            playlist_total=1,
+            skipped_by_reason={},
+            track=single_track_metadata,
+            playlist_info=single_track_playlist_info,  # kind=TRACK, not overridden yet
+        )
+        mock_extractor = MagicMock()
+        mock_extractor.extract.return_value = iter([extract_progress])
+
+        mock_downloader = MagicMock()
+        download_result = DownloadResult(
+            track=single_track_metadata,
+            status=DownloadStatus.SUCCESS,
+            output_path=tmp_path / "test.opus",
+        )
+        mock_downloader.download_tracks.return_value = iter(
+            [DownloadProgress(current=1, total=1, result=download_result)]
+        )
+
+        service = PlaylistDownloadService(
+            config=config,
+            extractor=mock_extractor,
+            downloader=mock_downloader,
+        )
+
+        list(service.download_playlist("https://www.youtube.com/watch?v=Vgpv5PtWsn4"))
+
+        result = service.get_result()
+        assert result is not None
+        assert result.playlist_info.kind == ContentKind.PODCAST_EPISODE
+
+    def test_podcast_override_ignored_for_soundcloud(
+        self,
+        single_track_metadata: TrackMetadata,
+        single_track_playlist_info: PlaylistInfo,
+        tmp_path: Path,
+    ) -> None:
+        """A podcast override must not leak into the SoundCloud pipeline —
+        podcast kind only applies to plain YouTube per plan scope."""
+        config = PlaylistDownloadConfig(
+            download=DownloadConfig(
+                base_path=tmp_path,
+                content_kind_override=ContentKind.PODCAST_EPISODE,
+            ),
+            generate_m3u=False,
+            save_cover=False,
+            apply_replaygain=False,
+        )
+
+        extract_progress = ExtractProgress(
+            current=1,
+            total=1,
+            playlist_total=1,
+            skipped_by_reason={},
+            track=single_track_metadata,
+            playlist_info=single_track_playlist_info,  # kind=TRACK
+        )
+        mock_soundcloud_extractor = MagicMock()
+        mock_soundcloud_extractor.extract.return_value = iter([extract_progress])
+
+        mock_soundcloud_downloader = MagicMock()
+        download_result = DownloadResult(
+            track=single_track_metadata,
+            status=DownloadStatus.SUCCESS,
+            output_path=tmp_path / "test.opus",
+        )
+        mock_soundcloud_downloader.download_tracks.return_value = iter(
+            [DownloadProgress(current=1, total=1, result=download_result)]
+        )
+
+        service = PlaylistDownloadService(config=config)
+        # Substitute the internal SoundCloud pipeline (real one would hit
+        # the network) rather than the constructor-injected default pair.
+        service._soundcloud_extractor = mock_soundcloud_extractor
+        service._soundcloud_downloader = mock_soundcloud_downloader
+
+        list(service.download_playlist("https://soundcloud.com/artist/track"))
+
+        result = service.get_result()
+        assert result is not None
+        assert result.playlist_info.kind == ContentKind.TRACK  # unchanged
+
+
 class TestPipelineCancellation:
     """Tests for cancellation propagation through the pipeline."""
 

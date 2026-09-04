@@ -55,7 +55,12 @@ async def create_job(
 
     Jobs are queued and executed sequentially. Returns 409 if queue is full.
     """
-    job = job_executor.create_and_start_job(request.url, request.max_items)
+    job = job_executor.create_and_start_job(
+        request.url,
+        request.max_items,
+        download_ugc=request.download_ugc,
+        is_podcast=request.is_podcast,
+    )
 
     if job is None:
         raise QueueFullError()

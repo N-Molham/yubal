@@ -27,6 +27,8 @@ class JobExecutionStore(Protocol):
         max_items: int | None = None,
         source: JobSource = JobSource.MANUAL,
         subscription_id: UUID | None = None,
+        download_ugc: bool | None = None,
+        is_podcast: bool = False,
     ) -> tuple[Job, bool] | None:
         """Create a new job.
 

@@ -19,8 +19,8 @@ from yubal.cli.state import ExtractionState
 from yubal.config import AudioCodec, DownloadConfig, PlaylistDownloadConfig
 from yubal.exceptions import YubalError
 from yubal.models.enums import DownloadStatus
+from yubal.providers import get_provider
 from yubal.services import PlaylistDownloadService
-from yubal.utils.url import is_single_track_url
 
 logger = logging.getLogger("yubal")
 
@@ -80,6 +80,14 @@ def download_cmd(
             help="Transliterate unicode to ASCII in filenames.",
         ),
     ] = False,
+    download_ugc: Annotated[
+        bool,
+        typer.Option(
+            "--download-ugc",
+            help="Download non-music/UGC videos too, to _Unofficial/ "
+            "(title/uploader/year, no album match).",
+        ),
+    ] = False,
 ) -> None:
     """Download tracks from a YouTube Music URL.
 
@@ -107,7 +115,9 @@ def download_cmd(
 
     try:
         # Detect single track URL and inform the user
-        if is_single_track_url(url):
+        provider = get_provider(url)
+        match = provider.match(url) if provider else None
+        if match and match.kind == "track":
             console.print("[cyan]Detected single track[/cyan]")
         # Configure the playlist download service
         config = PlaylistDownloadConfig(
@@ -117,6 +127,7 @@ def download_cmd(
                 quality=quality,
                 quiet=True,
                 ascii_filenames=ascii_filenames,
+                download_ugc=download_ugc,
             ),
             generate_m3u=not no_m3u,
             save_cover=not no_cover,

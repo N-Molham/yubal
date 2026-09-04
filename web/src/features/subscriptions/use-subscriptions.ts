@@ -16,7 +16,11 @@ export interface UseSubscriptionsResult {
   subscriptions: Subscription[];
   schedulerStatus: SchedulerStatus | null;
   isLoading: boolean;
-  addSubscription: (url: string, maxItems?: number) => Promise<boolean>;
+  addSubscription: (
+    url: string,
+    maxItems?: number,
+    isPodcast?: boolean,
+  ) => Promise<boolean>;
   updateSubscription: (
     id: string,
     updates: { enabled?: boolean },
@@ -38,8 +42,12 @@ export function useSubscriptions(): UseSubscriptionsResult {
   }, []);
 
   const addSubscription = useCallback(
-    async (url: string, maxItems?: number): Promise<boolean> => {
-      const result = await addSubscriptionApi(url, maxItems);
+    async (
+      url: string,
+      maxItems?: number,
+      isPodcast?: boolean,
+    ): Promise<boolean> => {
+      const result = await addSubscriptionApi(url, maxItems, isPodcast);
       if (!result.success) {
         showErrorToast("Failed to add subscription", result.error);
         return false;

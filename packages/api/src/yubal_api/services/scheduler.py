@@ -117,6 +117,7 @@ class Scheduler:
                     subscription.max_items,
                     JobSource.SCHEDULER,
                     subscription.id,
+                    is_podcast=subscription.is_podcast,
                 )
                 if job is None:
                     logger.warning(

@@ -3,11 +3,13 @@ import { SubscriptionCard } from "@/features/subscriptions/subscription-card";
 import { SubscriptionsTable } from "@/features/subscriptions/subscriptions-table";
 import { useSubscriptions } from "@/features/subscriptions/use-subscriptions";
 import { useScheduleCountdown } from "@/hooks/use-schedule-countdown";
+import { guessPlatformFromUrl } from "@/lib/platform";
 import { isValidUrl } from "@/lib/url";
 import {
   Alert,
   Button,
   Card,
+  Checkbox,
   InputGroup,
   NumberField,
   Spinner,
@@ -28,6 +30,7 @@ const DEFAULT_MAX_ITEMS = 100;
 export function SubscriptionsPage() {
   const [url, setUrl] = useState("");
   const [maxItems, setMaxItems] = useState(DEFAULT_MAX_ITEMS);
+  const [isPodcast, setIsPodcast] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const {
     subscriptions,
@@ -44,11 +47,18 @@ export function SubscriptionsPage() {
   const canAdd = isValidUrl(url);
   const isEmpty = subscriptions.length == 0;
   const canSyncAll = !isEmpty && !isSyncing && !isLoading;
+  // Coarse client-only guess, just to show/hide this picker — the backend
+  // is the real authority (rejects is_podcast for non-YouTube URLs).
+  const showPodcastPicker = guessPlatformFromUrl(url) === "youtube";
 
   const handleAdd = async () => {
     if (!canAdd) return;
     setIsAdding(true);
-    const success = await addSubscription(url.trim(), maxItems);
+    const success = await addSubscription(
+      url.trim(),
+      maxItems,
+      showPodcastPicker && isPodcast,
+    );
     if (success) {
       setUrl("");
     }
@@ -78,53 +88,66 @@ export function SubscriptionsPage() {
       <h1 className="text-foreground mb-6 text-2xl font-bold">My playlists</h1>
 
       {/* URL Input Section */}
-      <section className="mb-8 flex gap-2">
-        <div className="min-w-0 flex-1">
-          <UrlInput
-            value={url}
-            onChange={setUrl}
-            disabled={isAdding}
-            placeholder="Playlist URL to sync automatically"
-          />
-        </div>
-        <NumberField
-          className="w-24"
-          aria-label="Max tracks to sync per run"
-          value={maxItems}
-          onChange={(value) => {
-            if (!Number.isNaN(value) && value >= 1) setMaxItems(value);
-          }}
-          minValue={1}
-          maxValue={10000}
-        >
-          <InputGroup>
-            <InputGroup.Prefix>
-              <HashIcon className="text-muted h-4 w-4" />
-            </InputGroup.Prefix>
-            <InputGroup.Input
-              placeholder="Max"
-              className="w-full min-w-0 font-mono"
+      <section className="mb-8 flex flex-col gap-2">
+        <div className="flex gap-2">
+          <div className="min-w-0 flex-1">
+            <UrlInput
+              value={url}
+              onChange={setUrl}
+              disabled={isAdding}
+              placeholder="Playlist URL to sync automatically"
             />
-          </InputGroup>
-        </NumberField>
-        <Button
-          variant="primary"
-          className="shrink-0"
-          onPress={handleAdd}
-          isDisabled={!canAdd}
-          isPending={isAdding}
-        >
-          {({ isPending }) => (
-            <>
-              {isPending ? (
-                <Spinner color="current" size="sm" />
-              ) : (
-                <ZapIcon className="h-4 w-4" />
-              )}
-              Subscribe
-            </>
-          )}
-        </Button>
+          </div>
+          <NumberField
+            className="w-24"
+            aria-label="Max tracks to sync per run"
+            value={maxItems}
+            onChange={(value) => {
+              if (!Number.isNaN(value) && value >= 1) setMaxItems(value);
+            }}
+            minValue={1}
+            maxValue={10000}
+          >
+            <InputGroup>
+              <InputGroup.Prefix>
+                <HashIcon className="text-muted h-4 w-4" />
+              </InputGroup.Prefix>
+              <InputGroup.Input
+                placeholder="Max"
+                className="w-full min-w-0 font-mono"
+              />
+            </InputGroup>
+          </NumberField>
+          <Button
+            variant="primary"
+            className="shrink-0"
+            onPress={handleAdd}
+            isDisabled={!canAdd}
+            isPending={isAdding}
+          >
+            {({ isPending }) => (
+              <>
+                {isPending ? (
+                  <Spinner color="current" size="sm" />
+                ) : (
+                  <ZapIcon className="h-4 w-4" />
+                )}
+                Subscribe
+              </>
+            )}
+          </Button>
+        </div>
+        {showPodcastPicker && (
+          <Checkbox isSelected={isPodcast} onChange={setIsPodcast}>
+            <Checkbox.Content>
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              Treat synced episodes as podcasts (files go to _Podcasts/, no
+              lyrics or album gain)
+            </Checkbox.Content>
+          </Checkbox>
+        )}
       </section>
 
       {/* Stats Cards */}
