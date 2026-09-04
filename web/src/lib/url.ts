@@ -1,8 +1,14 @@
-// Must match backend validation in packages/api/src/yubal_api/schemas/jobs.py
-// and core validation in packages/yubal/src/yubal/utils/url.py
-export const YOUTUBE_URL_PATTERN =
-  /^https?:\/\/(music\.youtube\.com\/(playlist\?list=|browse\/|watch\?v=)|(?:www\.|m\.)?youtube\.com\/(playlist\?list=|watch\?v=|shorts\/|live\/|embed\/|e\/|v\/|vi\/)|youtu\.be\/|(?:www\.)?youtube-nocookie\.com\/embed\/)[\w-]+/;
-
+// Real validation lives server-side (GET /api/info), backed by the source
+// provider registry in packages/yubal/src/yubal/providers — that's the only
+// place that actually knows which sources (YouTube Music, YouTube, SoundCloud)
+// are supported. This is just a cheap "looks like a URL" gate so obviously
+// invalid input doesn't reach the network.
 export function isValidUrl(url: string): boolean {
-  return YOUTUBE_URL_PATTERN.test(url);
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
 }

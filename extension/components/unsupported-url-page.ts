@@ -35,7 +35,7 @@ export function UnsupportedUrlPage({
         h1({ class: "text-base font-semibold" }, "No Media Detected"),
         p(
           { class: "text-center text-sm text-mist-400" },
-          "Open a track, playlist, or album on YouTube or YouTube Music to start downloading.",
+          "Open a track, playlist, or album on YouTube, YouTube Music, or SoundCloud to start downloading.",
         ),
       ),
       div(
@@ -63,6 +63,21 @@ export function UnsupportedUrlPage({
           },
           rawHtml(PLAY_ICON),
           "youtube.com",
+          span(
+            {
+              class: "ml-auto self-center [&>svg]:size-3 [&>svg]:text-mist-500",
+            },
+            rawHtml(EXTERNAL_LINK_ICON),
+          ),
+        ),
+        a(
+          {
+            href: "https://soundcloud.com",
+            target: "_blank",
+            class: btnClass,
+          },
+          rawHtml(HEADPHONES_ICON),
+          "soundcloud.com",
           span(
             {
               class: "ml-auto self-center [&>svg]:size-3 [&>svg]:text-mist-500",

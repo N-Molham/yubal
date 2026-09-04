@@ -15,7 +15,7 @@ export default defineConfig({
   },
   manifest: {
     name: "yubal",
-    description: "Send YouTube URLs to your yubal instance",
+    description: "Send YouTube or SoundCloud URLs to your yubal instance",
     homepage_url: "https://yubal.guillevc.dev",
     permissions: ["storage", "activeTab", "tabs"],
     browser_specific_settings: {
