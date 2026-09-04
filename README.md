@@ -2,7 +2,7 @@
 
 # yubal
 
-Self-hosted YouTube Music downloader. Paste a link, get a tagged, organized library.
+Self-hosted YouTube Music, YouTube, and SoundCloud downloader. Paste a link, get a tagged, organized library.
 
 Scheduled sync. Smart deduplication. Media server ready. Browser extension included.
 
@@ -25,7 +25,7 @@ Scheduled sync. Smart deduplication. Media server ready. Browser extension inclu
 
 Downloading music is easy. _Organizing_ it is the hard part.
 
-yubal takes a YouTube Music URL and produces a clean, tagged music library:
+yubal takes a YouTube Music, YouTube, or SoundCloud URL and produces a clean, tagged music library:
 
 ```
 data/
@@ -63,7 +63,9 @@ When downloading a playlist, each track lives in its album folder; the M3U file 
 ## ✨ Features
 
 - **Web UI** — Real-time progress, job queue, works on mobile
-- **Albums, playlists & tracks** — Paste any YouTube Music link, get organized files
+- **Multi-source** — YouTube Music, plain YouTube (as music or podcast), and SoundCloud (tracks, sets/albums, and user likes) — see [supported URLs](docs/urls.md)
+- **Albums, playlists & tracks** — Paste a link, get organized files
+- **Podcast support** — Classify plain YouTube content as podcast episodes at download time (own `_Podcasts/` folder, no lyrics or album-level gain) — never auto-detected, always your choice
 - **Scheduled sync** — Subscribe to playlists; new tracks appear in your library automatically
 - **Smart deduplication** — Same track across 10 playlists? Stored once, referenced everywhere
 - **Reliable downloads** — Automatic retry on failures, graceful cancellation
@@ -75,7 +77,7 @@ When downloading a playlist, each track lives in its album folder; the M3U file 
 
 ## 🧩 Browser Extension
 
-Download tracks and subscribe to playlists directly from YouTube and YouTube Music without leaving the page.
+Download tracks and subscribe to playlists directly from YouTube, YouTube Music, or SoundCloud without leaving the page.
 
 <p>
   <img src="https://raw.githubusercontent.com/guillevc/yubal/refs/heads/master/extension/docs/images/extension-track.png" alt="Track view" width="32%">
@@ -225,6 +227,13 @@ Need age-restricted content, private playlists, your **Liked Music** (`list=LM`)
 - [x] Automatic lyrics (.lrc) ([v0.3.0](https://github.com/guillevc/yubal/releases/tag/v0.3.0))
 - [x] Single track downloads ([v0.3.0](https://github.com/guillevc/yubal/releases/tag/v0.3.0))
 - [x] Playlist support with M3U generation ([v0.2.0](https://github.com/guillevc/yubal/releases/tag/v0.2.0))
+
+### This fork's additions
+
+- [x] SoundCloud support — tracks, sets/albums, and user likes (as a sync subscription source)
+- [x] Plain YouTube support — non-catalogued/UGC content via the existing extraction pipeline
+- [x] Podcast classification for plain YouTube content — user choice at download time, own `_Podcasts/` folder, no lyrics or album gain
+- [x] Source badges in the web UI (job cards, subscription rows) showing which platform content came from
 
 ## 💜 Support
 

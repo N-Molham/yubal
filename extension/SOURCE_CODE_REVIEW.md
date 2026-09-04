@@ -6,8 +6,9 @@ for add-on review purposes.
 ## Overview
 
 yubal is a companion browser extension for [yubal](https://github.com/guillevc/yubal),
-a self-hosted YouTube Music library manager. The extension sends YouTube URLs
-from the browser to a user-configured yubal server instance.
+a self-hosted music library manager (YouTube Music, YouTube, and SoundCloud). The
+extension sends the current page's URL from the browser to a user-configured
+yubal server instance.
 
 - **Framework**: [WXT](https://wxt.dev/) (Web Extension Tools)
 - **Language**: TypeScript
