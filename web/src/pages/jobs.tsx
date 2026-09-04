@@ -2,6 +2,7 @@ import { UrlInput } from "@/components/common/url-input";
 import { LogsPanel } from "@/features/logs/logs-panel";
 import { JobsPanel } from "@/features/jobs/jobs-panel";
 import { useJobs } from "@/features/jobs/jobs-context";
+import { guessPlatformFromUrl } from "@/lib/platform";
 import { isValidUrl } from "@/lib/url";
 import { Button, Checkbox, InputGroup, NumberField } from "@heroui/react";
 import { DownloadIcon, HashIcon } from "lucide-react";
@@ -14,6 +15,7 @@ interface DownloadFormProps {
     url: string,
     maxItems: number,
     downloadUgc: boolean,
+    isPodcast: boolean,
   ) => Promise<void>;
 }
 
@@ -23,12 +25,21 @@ const DownloadForm = memo(function DownloadForm({
   const [url, setUrl] = useState("");
   const [maxItems, setMaxItems] = useState(DEFAULT_MAX_ITEMS);
   const [downloadUgc, setDownloadUgc] = useState(false);
+  const [isPodcast, setIsPodcast] = useState(false);
 
   const canDownload = isValidUrl(url);
+  // Coarse client-only guess, just to show/hide this picker — the backend
+  // is the real authority (rejects is_podcast for non-YouTube URLs).
+  const showPodcastPicker = guessPlatformFromUrl(url) === "youtube";
 
   const handleDownload = async () => {
     if (canDownload) {
-      await onDownload(url, maxItems, downloadUgc);
+      await onDownload(
+        url,
+        maxItems,
+        downloadUgc,
+        showPodcastPicker && isPodcast,
+      );
       setUrl("");
     }
   };
@@ -77,6 +88,16 @@ const DownloadForm = memo(function DownloadForm({
           Include non-music content (UGC videos, no album match)
         </Checkbox.Content>
       </Checkbox>
+      {showPodcastPicker && (
+        <Checkbox isSelected={isPodcast} onChange={setIsPodcast}>
+          <Checkbox.Content>
+            <Checkbox.Control>
+              <Checkbox.Indicator />
+            </Checkbox.Control>
+            Treat as podcast (files go to _Podcasts/, no lyrics or album gain)
+          </Checkbox.Content>
+        </Checkbox>
+      )}
     </section>
   );
 });

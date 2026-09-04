@@ -59,7 +59,7 @@ def create_subscription(
     service: SubscriptionServiceDep,
 ) -> SubscriptionResponse:
     """Create a new subscription."""
-    created = service.create(str(data.url), data.max_items)
+    created = service.create(str(data.url), data.max_items, data.is_podcast)
     return SubscriptionResponse.model_validate(created)
 
 

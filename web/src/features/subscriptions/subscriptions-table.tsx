@@ -66,6 +66,7 @@ export function SubscriptionsTable({
                 <span>{subscription.name}</span>
                 <span className="text-muted text-xs font-normal">
                   {platformLabel(subscription.platform)}
+                  {subscription.is_podcast ? " · Podcast" : ""}
                 </span>
               </div>
             </div>

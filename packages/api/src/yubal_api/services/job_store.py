@@ -70,6 +70,7 @@ class JobStore:
         source: JobSource = JobSource.MANUAL,
         subscription_id: UUID | None = None,
         download_ugc: bool | None = None,
+        is_podcast: bool = False,
     ) -> tuple[Job, bool] | None:
         """Create a new job.
 
@@ -84,6 +85,8 @@ class JobStore:
             subscription_id: Optional subscription that triggered this job.
             download_ugc: Per-job override for including non-music/UGC
                 content. None falls back to the instance-wide setting.
+            is_podcast: User choice to classify this as a podcast episode
+                instead of music. Never auto-detected.
 
         Returns:
             Tuple of (job, should_start_immediately), or None if queue is full.
@@ -99,6 +102,7 @@ class JobStore:
                 audio_format=audio_format,
                 max_items=max_items,
                 download_ugc=download_ugc,
+                is_podcast=is_podcast,
                 platform=classify_source(url),
                 subscription_id=subscription_id,
                 source=source,

@@ -35,6 +35,7 @@ class Job(BaseModel):
     audio_format: AudioCodec = AudioCodec.OPUS
     max_items: int | None = None
     download_ugc: bool | None = None
+    is_podcast: bool = False
     platform: Source | None = None  # which service this came from
     subscription_id: UUID | None = None
     source: JobSource = JobSource.MANUAL

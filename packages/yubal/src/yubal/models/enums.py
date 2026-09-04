@@ -69,11 +69,17 @@ class MatchResult(StrEnum):
 
 
 class ContentKind(StrEnum):
-    """Type of music content (album vs playlist vs track)."""
+    """Type of content (album vs playlist vs track vs podcast).
+
+    PODCAST_EPISODE is a user choice (see DownloadConfig.content_kind_override),
+    never auto-detected — it replaces ALBUM/PLAYLIST/TRACK classification for
+    the whole job when chosen, not a second axis on top of it.
+    """
 
     ALBUM = "album"
     PLAYLIST = "playlist"
     TRACK = "track"
+    PODCAST_EPISODE = "podcast_episode"
 
 
 class Source(StrEnum):

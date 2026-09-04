@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from yubal.config import AudioCodec, DownloadConfig
 from yubal.exceptions import CancellationError, DownloadError
 from yubal.models.cancel import CancelToken
-from yubal.models.enums import MatchResult, VideoType
+from yubal.models.enums import ContentKind, MatchResult, VideoType
 from yubal.models.track import TrackMetadata
 from yubal.services.download_service import (
     DownloadResult,
@@ -429,6 +429,59 @@ class TestDownloadService:
         call_args = mock_tag.call_args[0]
         assert call_args[1] == sample_track  # track metadata
         assert call_args[2] == b"cover data"  # cover bytes
+
+
+class TestPodcastClassification:
+    """Tests for content_kind_override=PODCAST_EPISODE behavior."""
+
+    def test_output_path_uses_podcast_convention(
+        self,
+        sample_track: TrackMetadata,
+        tmp_path: Path,
+    ) -> None:
+        """Podcast override should route to _Podcasts/, not the normal
+        Artist/Album tree, regardless of match_result."""
+        config = DownloadConfig(
+            base_path=tmp_path,
+            content_kind_override=ContentKind.PODCAST_EPISODE,
+        )
+        service = DownloadService(config, MockDownloader())
+
+        result = service.download_track(sample_track)
+
+        assert result.output_path is not None
+        assert "_Podcasts" in result.output_path.parts
+        assert sample_track.artist in result.output_path.parts
+
+    def test_podcast_override_skips_lyrics_even_when_fetch_lyrics_enabled(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Lyrics must be skipped for podcasts even if fetch_lyrics=True —
+        this isn't something a caller can accidentally leave enabled."""
+        config = DownloadConfig(
+            base_path=tmp_path,
+            fetch_lyrics=True,
+            content_kind_override=ContentKind.PODCAST_EPISODE,
+        )
+        service = DownloadService(config, MockDownloader())
+
+        assert service._lyrics_service is None
+
+    def test_non_podcast_override_uses_normal_path(
+        self,
+        sample_track: TrackMetadata,
+        tmp_path: Path,
+    ) -> None:
+        """No override (the default) keeps the existing match_result-based
+        path convention untouched."""
+        config = DownloadConfig(base_path=tmp_path)
+        service = DownloadService(config, MockDownloader())
+
+        result = service.download_track(sample_track)
+
+        assert result.output_path is not None
+        assert "_Podcasts" not in result.output_path.parts
 
 
 class TestLyricsFallback:

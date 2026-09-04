@@ -26,9 +26,15 @@ export async function createJob(
   url: string,
   maxItems?: number,
   downloadUgc?: boolean,
+  isPodcast?: boolean,
 ): Promise<CreateJobResult> {
   const { data, error, response } = await api.POST("/jobs", {
-    body: { url, max_items: maxItems, download_ugc: downloadUgc },
+    body: {
+      url,
+      max_items: maxItems,
+      download_ugc: downloadUgc,
+      is_podcast: isPodcast ?? false,
+    },
   });
 
   if (error) {

@@ -230,6 +230,19 @@ class PlaylistDownloadService:
                 self._last_result = None
                 return
 
+            # Podcast is a user choice at job creation, not auto-detected, and
+            # only meaningful for the plain-YouTube pipeline (see plan) — a
+            # SoundCloud job requesting it is silently ignored rather than
+            # producing a mixed-up classification.
+            if (
+                not is_soundcloud
+                and self._config.download.content_kind_override
+                == ContentKind.PODCAST_EPISODE
+            ):
+                playlist_info = playlist_info.model_copy(
+                    update={"kind": ContentKind.PODCAST_EPISODE}
+                )
+
             # Phase 2: Download tracks to disk
             download_results: list[DownloadResult] = []
 

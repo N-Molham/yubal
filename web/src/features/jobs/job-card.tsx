@@ -144,7 +144,7 @@ function ContentInfo({
   audioCodec: string | null;
   audioBitrate: number | null;
   showBitrate: boolean;
-  kind: "playlist" | "album" | "track" | null;
+  kind: "playlist" | "album" | "track" | "podcast_episode" | null;
   platform: "youtube_music" | "youtube" | "soundcloud" | null;
   source: "manual" | "scheduler";
   createdAt: string | undefined;
@@ -181,7 +181,9 @@ function ContentInfo({
         )}
         {kind && (
           <JobChip variant={kind}>
-            <span className="capitalize">{kind}</span>
+            <span className="capitalize">
+              {kind === "podcast_episode" ? "Podcast" : kind}
+            </span>
           </JobChip>
         )}
         {platformText && (

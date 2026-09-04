@@ -416,10 +416,14 @@ export interface components {
         };
         /**
          * ContentKind
-         * @description Type of music content (album vs playlist vs track).
+         * @description Type of content (album vs playlist vs track vs podcast).
+         *
+         *     PODCAST_EPISODE is a user choice (see DownloadConfig.content_kind_override),
+         *     never auto-detected — it replaces ALBUM/PLAYLIST/TRACK classification for
+         *     the whole job when chosen, not a second axis on top of it.
          * @enum {string}
          */
-        ContentKind: "album" | "playlist" | "track";
+        ContentKind: "album" | "playlist" | "track" | "podcast_episode";
         /**
          * CookiesStatusResponse
          * @description Cookies status response model.
@@ -470,6 +474,12 @@ export interface components {
              * @description Include non-music/UGC videos for this job. Defaults to the instance-wide YUBAL_DOWNLOAD_UGC setting when omitted.
              */
             download_ugc?: boolean | null;
+            /**
+             * Is Podcast
+             * @description Treat this as a podcast episode, not music. Only valid for plain YouTube URLs (not YouTube Music or SoundCloud) — never auto-detected, always an explicit user choice.
+             * @default false
+             */
+            is_podcast: boolean;
         };
         /**
          * ErrorResponse
@@ -521,6 +531,11 @@ export interface components {
              * @default null
              */
             download_ugc: boolean | null;
+            /**
+             * Is Podcast
+             * @default false
+             */
+            is_podcast: boolean;
             /** @default null */
             platform: components["schemas"]["Source"] | null;
             /**
@@ -876,6 +891,12 @@ export interface components {
             url: string;
             /** Max Items */
             max_items?: number | null;
+            /**
+             * Is Podcast
+             * @description Treat synced content as podcast episodes, not music. Only valid for plain YouTube URLs (not YouTube Music or SoundCloud).
+             * @default false
+             */
+            is_podcast: boolean;
         };
         /**
          * SubscriptionListResponse
@@ -913,6 +934,8 @@ export interface components {
              */
             thumbnail_url?: string | null;
             platform: components["schemas"]["Source"];
+            /** Is Podcast */
+            is_podcast: boolean;
             /**
              * Created At
              * Format: date-time

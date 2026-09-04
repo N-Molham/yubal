@@ -28,12 +28,14 @@ class FakeJobStore:
         source: JobSource = JobSource.MANUAL,
         subscription_id: UUID | None = None,
         download_ugc: bool | None = None,
+        is_podcast: bool = False,
     ) -> tuple[Job, bool] | None:
         job = Job(
             id="test-job",
             url=url,
             audio_format=audio_format,
             download_ugc=download_ugc,
+            is_podcast=is_podcast,
         )
         return job, True
 
@@ -245,3 +247,74 @@ class TestExecutorDownloadUgc:
         await executor._run_job("test-job", "https://example.com")
 
         assert captured == [True]
+
+
+@pytest.mark.enable_socket
+class TestExecutorIsPodcast:
+    """Tests for is_podcast propagation through JobExecutor to SyncService."""
+
+    @pytest.fixture
+    def store(self) -> FakeJobStore:
+        return FakeJobStore()
+
+    @pytest.mark.asyncio
+    async def test_is_podcast_passed_to_sync_service(
+        self,
+        store: FakeJobStore,
+        tmp_path: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """is_podcast should be forwarded to SyncService."""
+        executor = JobExecutor(job_store=store, base_path=tmp_path)
+
+        captured: list[bool] = []
+
+        original_init = SyncService.__init__
+
+        def spy_init(self: Any, *args: Any, **kwargs: Any) -> None:
+            original_init(self, *args, **kwargs)
+            captured.append(self.is_podcast)
+
+        monkeypatch.setattr(
+            "yubal_api.services.job_executor.SyncService.__init__",
+            spy_init,
+        )
+        monkeypatch.setattr(
+            "yubal_api.services.job_executor.SyncService.run",
+            lambda *a, **kw: SyncResult(success=True),
+        )
+
+        await executor._run_job("test-job", "https://example.com", is_podcast=True)
+
+        assert captured == [True]
+
+    @pytest.mark.asyncio
+    async def test_is_podcast_defaults_to_false(
+        self,
+        store: FakeJobStore,
+        tmp_path: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """is_podcast should default to False when not specified."""
+        executor = JobExecutor(job_store=store, base_path=tmp_path)
+
+        captured: list[bool] = []
+
+        original_init = SyncService.__init__
+
+        def spy_init(self: Any, *args: Any, **kwargs: Any) -> None:
+            original_init(self, *args, **kwargs)
+            captured.append(self.is_podcast)
+
+        monkeypatch.setattr(
+            "yubal_api.services.job_executor.SyncService.__init__",
+            spy_init,
+        )
+        monkeypatch.setattr(
+            "yubal_api.services.job_executor.SyncService.run",
+            lambda *a, **kw: SyncResult(success=True),
+        )
+
+        await executor._run_job("test-job", "https://example.com")
+
+        assert captured == [False]

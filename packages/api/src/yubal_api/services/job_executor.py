@@ -101,6 +101,7 @@ class JobExecutor:
         source: JobSource = JobSource.MANUAL,
         subscription_id: UUID | None = None,
         download_ugc: bool | None = None,
+        is_podcast: bool = False,
     ) -> Job | None:
         """Create a new job and start it if ready.
 
@@ -115,12 +116,20 @@ class JobExecutor:
             subscription_id: Optional subscription that triggered this job.
             download_ugc: Per-job override for including non-music/UGC
                 content. None falls back to the instance-wide setting.
+            is_podcast: User choice to classify this as a podcast episode
+                instead of music. Never auto-detected.
 
         Returns:
             The created Job, or None if queue is full.
         """
         result = self._job_store.create(
-            url, self._audio_format, max_items, source, subscription_id, download_ugc
+            url,
+            self._audio_format,
+            max_items,
+            source,
+            subscription_id,
+            download_ugc,
+            is_podcast,
         )
         if result is None:
             return None
@@ -142,7 +151,12 @@ class JobExecutor:
         """
         task = asyncio.create_task(
             self._run_job(
-                job.id, job.url, job.max_items, job.subscription_id, job.download_ugc
+                job.id,
+                job.url,
+                job.max_items,
+                job.subscription_id,
+                job.download_ugc,
+                job.is_podcast,
             ),
             name=f"job-{job.id[:8]}",  # Helpful for debugging
         )
@@ -188,6 +202,7 @@ class JobExecutor:
         max_items: int | None = None,
         subscription_id: UUID | None = None,
         download_ugc: bool | None = None,
+        is_podcast: bool = False,
     ) -> None:
         """Background task that runs the sync operation."""
         cancel_token = CancelToken()
@@ -248,6 +263,7 @@ class JobExecutor:
                     download_ugc if download_ugc is not None else self._download_ugc,
                     self._cache_path,
                     self._audio_quality,
+                    is_podcast,
                 )
                 result = await asyncio.to_thread(
                     sync_service.run,

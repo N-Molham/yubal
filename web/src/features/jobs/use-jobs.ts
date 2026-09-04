@@ -99,8 +99,13 @@ export function useJobsState() {
   }, []);
 
   const startJob = useCallback(
-    async (url: string, maxItems?: number, downloadUgc?: boolean) => {
-      const result = await createJob(url, maxItems, downloadUgc);
+    async (
+      url: string,
+      maxItems?: number,
+      downloadUgc?: boolean,
+      isPodcast?: boolean,
+    ) => {
+      const result = await createJob(url, maxItems, downloadUgc, isPodcast);
       if (!result.success) {
         showErrorToast("Download failed", result.error);
       }

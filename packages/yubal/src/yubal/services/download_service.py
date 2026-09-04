@@ -16,7 +16,7 @@ from yubal.client import YTMusicProtocol
 from yubal.config import DownloadConfig
 from yubal.exceptions import CancellationError, DownloadError
 from yubal.models.cancel import CancelToken
-from yubal.models.enums import DownloadStatus, MatchResult, SkipReason
+from yubal.models.enums import ContentKind, DownloadStatus, MatchResult, SkipReason
 from yubal.models.progress import DownloadProgress
 from yubal.models.results import DownloadResult
 from yubal.models.track import TrackMetadata
@@ -32,6 +32,7 @@ from yubal.services.lyrics import (
 from yubal.services.tagging_service import AudioFileTaggingService
 from yubal.utils.cover import fetch_cover
 from yubal.utils.filename import (
+    build_podcast_episode_path,
     build_track_path,
     build_unmatched_track_path,
     build_unofficial_track_path,
@@ -410,11 +411,15 @@ class DownloadService:
     ) -> LyricsServiceProtocol | None:
         """Construct the default composite lyrics service.
 
-        Returns None when lyrics fetching is disabled. Always includes the
-        lrclib fetcher; appends the YouTube Music fetcher when a client is
-        available and `ytmusic_lyrics_fallback` is enabled.
+        Returns None when lyrics fetching is disabled, or unconditionally
+        for podcast-classified jobs (spoken-word content, not worth the
+        lookup calls). Always includes the lrclib fetcher; appends the
+        YouTube Music fetcher when a client is available and
+        `ytmusic_lyrics_fallback` is enabled.
         """
         if not config.fetch_lyrics:
+            return None
+        if config.content_kind_override == ContentKind.PODCAST_EPISODE:
             return None
 
         fetchers: list[LyricsFetcher] = [LrclibFetcher()]
@@ -615,6 +620,15 @@ class DownloadService:
         Returns:
             Output path (without extension, yt-dlp adds it during download).
         """
+        if self._config.content_kind_override == ContentKind.PODCAST_EPISODE:
+            return build_podcast_episode_path(
+                base=self._config.base_path,
+                channel=track.artist,
+                year=track.year,
+                title=track.title,
+                ascii_filenames=self._config.ascii_filenames,
+            )
+
         match track.match_result:
             case MatchResult.UNMATCHED:
                 return build_unmatched_track_path(
