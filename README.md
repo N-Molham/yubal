@@ -6,12 +6,9 @@ Self-hosted YouTube Music, YouTube, and SoundCloud downloader. Paste a link, get
 
 Scheduled sync. Smart deduplication. Media server ready. Browser extension included.
 
-[![CI](https://github.com/guillevc/yubal/actions/workflows/ci.yaml/badge.svg)](https://github.com/guillevc/yubal/actions/workflows/ci.yaml)
-[![Release](https://img.shields.io/github/v/release/guillevc/yubal)](https://github.com/guillevc/yubal/releases)
-[![Firefox Add-on](https://img.shields.io/amo/v/yubal?label=firefox%20add-on&logo=firefox&logoColor=white&color=orange)](https://addons.mozilla.org/firefox/addon/yubal/)
-[![Chrome Extension](https://img.shields.io/github/v/release/guillevc/yubal?filter=ext-v*&label=chrome%20extension&logo=googlechrome&logoColor=white&color=orange)](https://github.com/guillevc/yubal/releases?q=🧩)
-[![Docker](https://img.shields.io/badge/ghcr.io-blue?logo=docker&logoColor=white)](https://ghcr.io/guillevc/yubal)
-[![codecov](https://codecov.io/gh/guillevc/yubal/branch/master/graph/badge.svg)](https://codecov.io/gh/guillevc/yubal)
+[![Docker](https://img.shields.io/badge/ghcr.io-blue?logo=docker&logoColor=white)](https://github.com/users/N-Molham/packages/container/package/yubal)
+
+This is a fork of [guillevc/yubal](https://github.com/guillevc/yubal), adding SoundCloud support and plain-YouTube-as-audio/podcast support on top of the original YouTube Music downloader. Upstream badges (CI, release, extension stores, coverage) removed here since this fork doesn't run that automation — see [upstream's README](https://github.com/guillevc/yubal#readme) for those.
 
 <picture>
   <img src="docs/demo.gif" alt="yubal demo" width="75%">
@@ -97,7 +94,7 @@ More info in the extension's [README.md](https://github.com/guillevc/yubal/blob/
 # compose.yaml
 services:
   yubal:
-    image: ghcr.io/guillevc/yubal:latest
+    image: ghcr.io/n-molham/yubal:latest
     container_name: yubal
     ports:
       - 8000:8000
@@ -122,6 +119,15 @@ docker compose up -d
 ```
 
 > **Unraid?** Use the [community Docker template](https://github.com/SerpentDrago/UnraidDockerTemplates/tree/main/yubal) by [@SerpentDrago](https://github.com/SerpentDrago) ([unraid forum thread](https://forums.unraid.net/topic/197157-support-yubal-self-hosted-youtube-music-downloader/)).
+
+### 🏗️ Building Your Own Image
+
+This fork has no GitHub Actions CI/CD — images are built and pushed manually via `scripts/`:
+
+- `scripts/build-run.sh` — local build + run, no registry involved. Good for iterating on Dockerfile/entrypoint changes.
+- `scripts/build-deploy.sh` — builds and pushes to `ghcr.io/<owner>/<repo>` (derived from your `origin` remote). Defaults to a multi-arch (`linux/amd64,linux/arm64`) push via `docker buildx` — required for the image to run correctly regardless of which architecture pulls it. Pass `--single-arch` for a faster host-arch-only build when just iterating locally. Run `scripts/build-deploy.sh --help`-equivalent (read the script's header comment) for the full flag list.
+
+ffmpeg, deno, and rsgain are not baked into the image — `entrypoint.sh` fetches each into `/app/config/bin/` (a persistent volume mount) on first boot only, keeping the pushed image small.
 
 ## ⚙️ Configuration
 
