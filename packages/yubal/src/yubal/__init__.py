@@ -60,10 +60,11 @@ from yubal.models.results import (
     PlaylistDownloadResult,
 )
 from yubal.models.track import PlaylistInfo, TrackMetadata
+from yubal.providers import is_supported_url
 from yubal.services import MetadataExtractorService, PlaylistDownloadService
 from yubal.services.download_service import DownloadService as _DownloadService
 from yubal.utils import cleanup_part_files, clear_cover_cache, fetch_cover
-from yubal.utils.url import is_single_track_url, is_supported_url, parse_playlist_id
+from yubal.utils.url import is_single_track_url, parse_playlist_id
 
 
 def create_extractor(

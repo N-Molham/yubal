@@ -6,7 +6,11 @@ from pathlib import Path
 
 from yubal import ContentKind, parse_playlist_id
 from yubal.client import YTMusicClient
+from yubal.exceptions import PlaylistNotFoundError
 from yubal.models.ytmusic import Playlist
+from yubal.providers.registry import get_provider
+from yubal.providers.soundcloud import SoundCloudProvider
+from yubal.services.soundcloud_extractor import SoundCloudExtractorService
 from yubal.utils.url import parse_video_id
 
 from yubal_api.domain.job import ContentInfo
@@ -42,6 +46,7 @@ class PlaylistInfoService:
             cookies_path: Optional path to cookies.txt for authenticated requests.
         """
         self._client = YTMusicClient(cookies_path=cookies_path)
+        self._soundcloud_extractor = SoundCloudExtractorService()
 
     def get_playlist_metadata(self, url: str) -> PlaylistMetadata:
         """Get the metadata of a playlist from its URL.
@@ -59,6 +64,10 @@ class PlaylistInfoService:
             UnsupportedPlaylistError: If playlist type is not supported (422).
             UpstreamAPIError: If API request fails (502).
         """
+        if isinstance(get_provider(url), SoundCloudProvider):
+            info = self._get_soundcloud_content_info(url)
+            return PlaylistMetadata(title=info.title, thumbnail_url=info.thumbnail_url)
+
         playlist_id = parse_playlist_id(url)
         playlist = self._client.get_playlist(playlist_id)
         title = playlist.title or "Unknown Playlist"
@@ -87,10 +96,40 @@ class PlaylistInfoService:
             UnsupportedPlaylistError: If playlist type is not supported (422).
             UpstreamAPIError: If API request fails (502).
         """
+        if isinstance(get_provider(url), SoundCloudProvider):
+            return self._get_soundcloud_content_info(url)
+
         video_id = parse_video_id(url)
         if video_id:
             return self._get_track_content_info(video_id, url)
         return self._get_playlist_content_info(url)
+
+    def _get_soundcloud_content_info(self, url: str) -> ContentInfo:
+        """Build ContentInfo from a SoundCloud track, set, or likes URL."""
+        info = self._soundcloud_extractor.fetch_info(url)
+        if info is None:
+            raise PlaylistNotFoundError(f"Could not resolve SoundCloud URL: {url}")
+
+        is_playlist = info.get("_type") == "playlist"
+        kind = ContentKind.TRACK
+        track_count = None
+        if is_playlist:
+            kind = (
+                ContentKind.ALBUM
+                if info.get("album_type") == "album"
+                else ContentKind.PLAYLIST
+            )
+            track_count = len([e for e in (info.get("entries") or []) if e])
+
+        return ContentInfo(
+            title=info.get("title") or "Unknown",
+            artist=info.get("uploader") or "Unknown Artist",
+            track_count=track_count,
+            playlist_id=str(info.get("id") or ""),
+            url=url,
+            thumbnail_url=info.get("thumbnail"),
+            kind=kind,
+        )
 
     def _get_playlist_content_info(self, url: str) -> ContentInfo:
         """Build ContentInfo from a playlist/album URL."""

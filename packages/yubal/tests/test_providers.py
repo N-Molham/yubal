@@ -19,6 +19,11 @@ class TestYouTubeMusicProvider:
 
     def test_returns_none_for_unsupported_url(self) -> None:
         provider = YouTubeMusicProvider()
+        assert provider.match("https://open.spotify.com/track/abc123") is None
+
+    def test_returns_none_for_soundcloud_url(self) -> None:
+        """SoundCloud is a different provider's territory, not YouTube Music's."""
+        provider = YouTubeMusicProvider()
         assert provider.match("https://soundcloud.com/artist/track") is None
 
     def test_resolve_download_url_builds_watch_url(self) -> None:
@@ -36,11 +41,19 @@ class TestRegistry:
         assert provider is not None
         assert provider.name == "youtube_music"
 
+    def test_get_provider_returns_soundcloud_for_soundcloud_url(self) -> None:
+        provider = get_provider("https://soundcloud.com/artist/track")
+        assert provider is not None
+        assert provider.name == "soundcloud"
+
     def test_get_provider_returns_none_for_unsupported_url(self) -> None:
-        assert get_provider("https://soundcloud.com/artist/track") is None
+        assert get_provider("https://open.spotify.com/track/abc123") is None
 
     def test_is_supported_url_true_for_youtube_music(self) -> None:
         assert is_supported_url("https://music.youtube.com/watch?v=Vgpv5PtWsn4")
 
+    def test_is_supported_url_true_for_soundcloud(self) -> None:
+        assert is_supported_url("https://soundcloud.com/artist/track")
+
     def test_is_supported_url_false_for_unsupported(self) -> None:
-        assert not is_supported_url("https://soundcloud.com/artist/track")
+        assert not is_supported_url("https://open.spotify.com/track/abc123")

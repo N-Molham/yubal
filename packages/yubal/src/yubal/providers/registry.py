@@ -1,9 +1,10 @@
 """Provider registry — dispatches a URL to the first provider that claims it."""
 
 from yubal.providers.base import SourceProvider
+from yubal.providers.soundcloud import SoundCloudProvider
 from yubal.providers.youtube_music import YouTubeMusicProvider
 
-_PROVIDERS: tuple[SourceProvider, ...] = (YouTubeMusicProvider(),)
+_PROVIDERS: tuple[SourceProvider, ...] = (YouTubeMusicProvider(), SoundCloudProvider())
 
 
 def get_provider(url: str) -> SourceProvider | None:

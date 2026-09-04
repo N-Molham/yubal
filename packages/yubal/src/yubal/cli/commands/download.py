@@ -19,8 +19,8 @@ from yubal.cli.state import ExtractionState
 from yubal.config import AudioCodec, DownloadConfig, PlaylistDownloadConfig
 from yubal.exceptions import YubalError
 from yubal.models.enums import DownloadStatus
+from yubal.providers import get_provider
 from yubal.services import PlaylistDownloadService
-from yubal.utils.url import is_single_track_url
 
 logger = logging.getLogger("yubal")
 
@@ -115,7 +115,9 @@ def download_cmd(
 
     try:
         # Detect single track URL and inform the user
-        if is_single_track_url(url):
+        provider = get_provider(url)
+        match = provider.match(url) if provider else None
+        if match and match.kind == "track":
             console.print("[cyan]Detected single track[/cyan]")
         # Configure the playlist download service
         config = PlaylistDownloadConfig(

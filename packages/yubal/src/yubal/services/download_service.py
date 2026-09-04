@@ -20,6 +20,7 @@ from yubal.models.enums import DownloadStatus, MatchResult, SkipReason
 from yubal.models.progress import DownloadProgress
 from yubal.models.results import DownloadResult
 from yubal.models.track import TrackMetadata
+from yubal.providers.base import SourceProvider
 from yubal.providers.youtube_music import YouTubeMusicProvider
 from yubal.services.lyrics import (
     LrclibFetcher,
@@ -89,6 +90,7 @@ class YTDLPDownloader:
         self,
         config: DownloadConfig,
         cookies_path: Path | None = None,
+        provider: SourceProvider | None = None,
     ) -> None:
         """Initialize the downloader.
 
@@ -96,10 +98,13 @@ class YTDLPDownloader:
             config: Download configuration (codec, quality, output paths).
             cookies_path: Optional path to cookies.txt for authentication.
                          Required for age-restricted or premium content.
+            provider: Source provider used to resolve the download identifier
+                      into a yt-dlp-downloadable URL. Defaults to
+                      YouTubeMusicProvider.
         """
         self._config = config
         self._cookies_path = cookies_path
-        self._provider = YouTubeMusicProvider()
+        self._provider = provider or YouTubeMusicProvider()
 
         if cookies_path and cookies_path.exists():
             logger.info("Using cookies for yt-dlp downloads")
@@ -525,8 +530,14 @@ class DownloadService:
                 skip_reason=SkipReason.FILE_EXISTS,
             )
 
+        # download_url (when set) is already a yt-dlp-downloadable URL —
+        # e.g. SoundCloud, which has no separate video-ID-to-URL mapping.
+        download_ref = track.download_url or video_id
+
         try:
-            actual_path = self._downloader.download(video_id, output_path, cancel_token)
+            actual_path = self._downloader.download(
+                download_ref, output_path, cancel_token
+            )
 
             # Tag the downloaded file with metadata
             self._apply_metadata_tags(actual_path, track)

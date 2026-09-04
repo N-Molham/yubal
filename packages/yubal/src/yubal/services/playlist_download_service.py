@@ -1,5 +1,6 @@
 """High-level playlist download pipeline."""
 
+import dataclasses
 import logging
 from collections.abc import Iterator
 from contextlib import nullcontext
@@ -17,15 +18,18 @@ from yubal.models.results import (
     aggregate_skip_reasons,
 )
 from yubal.models.track import PlaylistInfo, TrackMetadata
+from yubal.providers.registry import get_provider
+from yubal.providers.soundcloud import SoundCloudProvider
 from yubal.services.artifacts import (
     ArtifactPaths,
     PlaylistArtifactsProtocol,
     PlaylistArtifactsService,
 )
 from yubal.services.cache import ExtractionCache
-from yubal.services.download_service import DownloadService
+from yubal.services.download_service import DownloadService, YTDLPDownloader
 from yubal.services.extractor import MetadataExtractorService
 from yubal.services.replaygain import ReplayGainProtocol, ReplayGainService
+from yubal.services.soundcloud_extractor import SoundCloudExtractorService
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +122,23 @@ class PlaylistDownloadService:
         self._replaygain = replaygain or ReplayGainService()
         self._cache = ExtractionCache(config.cache_path) if config.cache_path else None
 
+        # SoundCloud has no catalog API (unlike YouTube Music/ytmusicapi) —
+        # extraction goes straight through yt-dlp's own info-dict, and
+        # lyrics are skipped (SoundCloud content skews remix/DJ-set, high
+        # lookup-miss rate, not worth the API calls).
+        self._soundcloud_extractor = SoundCloudExtractorService()
+        soundcloud_download_config = dataclasses.replace(
+            config.download, fetch_lyrics=False
+        )
+        self._soundcloud_downloader = DownloadService(
+            soundcloud_download_config,
+            downloader=YTDLPDownloader(
+                soundcloud_download_config,
+                cookies_path=cookies_path,
+                provider=SoundCloudProvider(),
+            ),
+        )
+
         # Store last result for retrieval after iteration
         self._last_result: PlaylistDownloadResult | None = None
 
@@ -181,17 +202,25 @@ class PlaylistDownloadService:
         )
         logger.info("URL: %s", url)
 
-        cache_ctx = self._cache if self._cache is not None else nullcontext()
+        is_soundcloud = isinstance(get_provider(url), SoundCloudProvider)
+        extractor = self._soundcloud_extractor if is_soundcloud else self._extractor
+        downloader = self._soundcloud_downloader if is_soundcloud else self._downloader
+        # SoundCloud has no separate extraction cache today (see __init__).
+        cache = None if is_soundcloud else self._cache
+
+        cache_ctx = cache if cache is not None else nullcontext()
         with cache_ctx:
             # Phase 1: Extract metadata (all URL types: track, album, playlist)
             extracted_tracks: list[TrackMetadata] = []
             playlist_info: PlaylistInfo | None = None
 
-            for progress, extract_progress in self._extract_phase(url, cancel_token):
+            for progress, extract_progress in self._extract_phase(
+                url, cancel_token, extractor=extractor, cache=cache
+            ):
                 if extract_progress.track is not None:
                     extracted_tracks.append(extract_progress.track)
-                    if self._cache is not None:
-                        self._cache.add(extract_progress.track)
+                    if cache is not None:
+                        cache.add(extract_progress.track)
                 playlist_info = extract_progress.playlist_info
                 yield progress
 
@@ -205,7 +234,7 @@ class PlaylistDownloadService:
             download_results: list[DownloadResult] = []
 
             for progress, result in self._download_phase(
-                extracted_tracks, cancel_token
+                extracted_tracks, cancel_token, downloader=downloader
             ):
                 download_results.append(result)
                 yield progress
@@ -325,16 +354,22 @@ class PlaylistDownloadService:
         self,
         url: str,
         cancel_token: CancelToken | None,
+        *,
+        extractor: MetadataExtractorService | SoundCloudExtractorService | None = None,
+        cache: ExtractionCache | None = None,
     ) -> Iterator[tuple[PlaylistProgress, ExtractProgress]]:
         """Execute metadata extraction phase with progress updates.
 
-        Fetches track metadata from the YouTube Music URL. Handles all URL types
-        (single track, album, playlist). Yields (progress, extract_progress)
-        tuples so the caller can collect tracks and playlist info.
+        Fetches track metadata from the source URL (YouTube Music or
+        SoundCloud). Handles all URL types (single track, album, playlist,
+        set). Yields (progress, extract_progress) tuples so the caller can
+        collect tracks and playlist info.
 
         Args:
-            url: YouTube Music URL (single track, album, or playlist).
+            url: Source URL (single track, album, playlist, or set).
             cancel_token: Optional cancellation token.
+            extractor: Extractor to use; defaults to the YouTube Music one.
+            cache: Extraction cache to populate; defaults to this service's.
 
         Yields:
             Tuples of (PlaylistProgress, ExtractProgress). The caller collects
@@ -345,11 +380,14 @@ class PlaylistDownloadService:
             extra={"phase": "extracting", "phase_num": 1},
         )
 
-        for progress in self._extractor.extract(
+        extractor = extractor or self._extractor
+        cache = cache if cache is not None else self._cache
+
+        for progress in extractor.extract(
             url,
             max_items=self._config.max_items,
             cancel_token=cancel_token,
-            cache=self._cache,
+            cache=cache,
         ):
             yield (
                 PlaylistProgress(
@@ -369,6 +407,8 @@ class PlaylistDownloadService:
         self,
         tracks: list[TrackMetadata],
         cancel_token: CancelToken | None,
+        *,
+        downloader: DownloadService | None = None,
     ) -> Iterator[tuple[PlaylistProgress, DownloadResult]]:
         """Execute track download phase with progress updates.
 
@@ -378,6 +418,7 @@ class PlaylistDownloadService:
         Args:
             tracks: List of track metadata to download.
             cancel_token: Optional cancellation token (checked by DownloadService).
+            downloader: Downloader to use; defaults to the YouTube Music one.
 
         Yields:
             Tuples of (PlaylistProgress, DownloadResult). The caller collects
@@ -391,7 +432,8 @@ class PlaylistDownloadService:
             extra={"phase": "downloading", "phase_num": 2},
         )
 
-        for progress in self._downloader.download_tracks(tracks, cancel_token):
+        downloader = downloader or self._downloader
+        for progress in downloader.download_tracks(tracks, cancel_token):
             yield (
                 PlaylistProgress(
                     phase="downloading",
