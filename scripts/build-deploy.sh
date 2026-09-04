@@ -7,13 +7,19 @@
 # build+run with no registry involved, use scripts/build-run.sh instead.
 #
 # Usage:
-#   scripts/build-deploy.sh                     # build + push :latest for this host's arch
+#   scripts/build-deploy.sh                     # build + push linux/amd64,linux/arm64 :latest (default, matches cd.yaml)
 #   scripts/build-deploy.sh --tag v0.1.0        # push a specific tag instead of :latest
-#   scripts/build-deploy.sh --multi-arch        # build+push linux/amd64,linux/arm64 (buildx, no local image)
+#   scripts/build-deploy.sh --single-arch       # build+push this host's arch only (no buildx, local image kept)
 #   scripts/build-deploy.sh --public            # set package visibility to public instead of private
 #   scripts/build-deploy.sh --dry-run           # print what would run, do nothing
 #   scripts/build-deploy.sh --check-only        # run prerequisite checks (buildx, ghcr login) and stop
 #   scripts/build-deploy.sh --image ghcr.io/other/repo   # override the target image
+#
+# Default is multi-arch: a single-arch image pushed to a shared registry
+# tag works fine on the build host, then fails with "exec format error" on
+# every OTHER architecture that pulls the same tag. --single-arch exists
+# for a fast local-only iteration loop, not for anything meant to be pulled
+# elsewhere.
 
 set -euo pipefail
 
@@ -43,7 +49,7 @@ derive_image() {
 
 TAG="latest"
 IMAGE="$(derive_image)"
-MULTI_ARCH=false
+MULTI_ARCH=true
 DRY_RUN=false
 CHECK_ONLY=false
 ALSO_LATEST=false
@@ -61,6 +67,10 @@ while [ $# -gt 0 ]; do
       ;;
     --multi-arch)
       MULTI_ARCH=true
+      shift
+      ;;
+    --single-arch)
+      MULTI_ARCH=false
       shift
       ;;
     --dry-run)
@@ -81,7 +91,7 @@ while [ $# -gt 0 ]; do
       ;;
     *)
       echo "Unknown option: $1" >&2
-      echo "Usage: $0 [--tag TAG] [--image ghcr.io/owner/repo] [--multi-arch] [--also-latest] [--public] [--dry-run] [--check-only]" >&2
+      echo "Usage: $0 [--tag TAG] [--image ghcr.io/owner/repo] [--single-arch] [--also-latest] [--public] [--dry-run] [--check-only]" >&2
       exit 1
       ;;
   esac
@@ -107,16 +117,19 @@ ensure_buildx() {
     exit 1
   fi
   if [ "$MULTI_ARCH" = true ]; then
-    echo "==> Ensuring buildx builder supports linux/amd64,linux/arm64"
-    if ! docker buildx inspect --bootstrap >/tmp/yubal-buildx-inspect.log 2>&1; then
+    echo "==> Ensuring buildx builder supports multi-platform --push"
+    # The default "docker" driver reports other platforms via QEMU on
+    # `buildx inspect` but can't actually do a multi-platform --push build
+    # ("Multi-platform build is not supported for the docker driver.").
+    # Only the docker-container driver can. Always use a dedicated builder
+    # for multi-arch, don't just probe for missing platforms.
+    if docker buildx inspect yubal-multiarch >/dev/null 2>&1; then
+      docker buildx use yubal-multiarch
+    else
       echo "==> Creating a dedicated buildx builder (yubal-multiarch)"
       docker buildx create --name yubal-multiarch --driver docker-container --use >/dev/null
-      docker buildx inspect --bootstrap >/dev/null
-    elif ! grep -q "linux/arm64" /tmp/yubal-buildx-inspect.log || ! grep -q "linux/amd64" /tmp/yubal-buildx-inspect.log; then
-      echo "==> Active builder is missing a platform; creating yubal-multiarch"
-      docker buildx create --name yubal-multiarch --driver docker-container --use >/dev/null
-      docker buildx inspect --bootstrap >/dev/null
     fi
+    docker buildx inspect --bootstrap >/dev/null
   fi
 }
 
@@ -200,7 +213,8 @@ ensure_ghcr_login() {
 set_package_visibility() {
   if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
     echo "==> Skipping visibility check (gh CLI not available/authenticated)."
-    echo "    Set it manually: https://github.com/${OWNER}/${PACKAGE_NAME}/pkgs/container/${PACKAGE_NAME} -> Package settings"
+    echo "    Set it manually: https://github.com/users/${OWNER}/packages/container/package/${PACKAGE_NAME} -> Package settings"
+    echo "    (org-owned package: https://github.com/orgs/${OWNER}/packages/container/package/${PACKAGE_NAME})"
     return 0
   fi
   echo "==> Setting ghcr.io package visibility to $VISIBILITY (best effort)"
@@ -209,7 +223,8 @@ set_package_visibility() {
   else
     echo "==> Could not set visibility automatically (API call failed, possibly missing"
     echo "    scope or org-owned package). Set it manually:"
-    echo "    https://github.com/${OWNER}/${PACKAGE_NAME}/pkgs/container/${PACKAGE_NAME} -> Package settings"
+    echo "    https://github.com/users/${OWNER}/packages/container/package/${PACKAGE_NAME} -> Package settings"
+    echo "    (org-owned package: https://github.com/orgs/${OWNER}/packages/container/package/${PACKAGE_NAME})"
   fi
 }
 
@@ -233,7 +248,10 @@ echo
 
 if [ "$MULTI_ARCH" = true ]; then
   # shellcheck disable=SC2054  # intentional single value, not array elements
-  CMD=(docker buildx build --platform linux/amd64,linux/arm64
+  # --provenance=false: buildx's default provenance attestation shows up as
+  # an extra "unknown/unknown" entry in the pushed manifest list — harmless,
+  # but confusing on the ghcr.io package page. Not needed here.
+  CMD=(docker buildx build --platform linux/amd64,linux/arm64 --provenance=false
     --build-arg "VERSION=$VERSION" --build-arg "COMMIT_SHA=$COMMIT_SHA" --build-arg "IS_RELEASE=$IS_RELEASE"
     -t "$FULL_TAG")
   [ "$ALSO_LATEST" = true ] && CMD+=(-t "${IMAGE}:latest")

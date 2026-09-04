@@ -1,5 +1,11 @@
 # Build frontend
-FROM oven/bun:1-alpine AS web-builder
+#
+# Pinned to $BUILDPLATFORM (the build host's arch), not the target platform:
+# bun's JIT crashes under QEMU emulation ("MemoryExhaustion" abort) on a
+# foreign-arch multi-platform build. Not a real cross-compile though — the
+# output is architecture-independent static JS/CSS/HTML, so building it once
+# natively and reusing it for every target platform is correct, not a hack.
+FROM --platform=$BUILDPLATFORM oven/bun:1-alpine AS web-builder
 
 ARG VERSION=dev
 ARG COMMIT_SHA=dev
