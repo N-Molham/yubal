@@ -1,5 +1,6 @@
 import type { Subscription } from "@/api/subscriptions";
 import { useTimeAgo } from "@/hooks/use-time-ago";
+import { platformLabel } from "@/lib/platform";
 import { Button, EmptyState, Spinner, Switch, Table } from "@heroui/react";
 import {
   InboxIcon,
@@ -61,7 +62,12 @@ export function SubscriptionsTable({
                   <ListMusicIcon className="text-muted size-5" />
                 </div>
               )}
-              {subscription.name}
+              <div className="flex flex-col">
+                <span>{subscription.name}</span>
+                <span className="text-muted text-xs font-normal">
+                  {platformLabel(subscription.platform)}
+                </span>
+              </div>
             </div>
           );
         case "lastSynced":

@@ -21,6 +21,7 @@ from yubal import (
     PlaylistDownloadConfig,
     PlaylistProgress,
     TrackMetadata,
+    classify_source,
     create_playlist_downloader,
 )
 from yubal.models.enums import ContentKind
@@ -157,6 +158,7 @@ def build_content_info(
         audio_codec=audio_format.upper(),
         audio_bitrate=None,  # Set after first successful download
         kind=playlist.kind,
+        platform=classify_source(url),
     )
 
 
@@ -181,6 +183,7 @@ def build_early_content_info(
         audio_codec=audio_format.upper(),
         audio_bitrate=None,
         kind=playlist.kind,
+        platform=classify_source(url),
     )
 
 

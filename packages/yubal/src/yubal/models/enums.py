@@ -74,3 +74,18 @@ class ContentKind(StrEnum):
     ALBUM = "album"
     PLAYLIST = "playlist"
     TRACK = "track"
+
+
+class Source(StrEnum):
+    """User-facing platform a piece of content came from.
+
+    A display/classification concept, not a 1:1 mirror of the provider
+    registry — YOUTUBE_MUSIC and YOUTUBE both route through the same
+    YouTubeMusicProvider/extraction pipeline (see providers.registry), but
+    users pasting a plain youtube.com link expect a "YouTube" label, not
+    "YouTube Music".
+    """
+
+    YOUTUBE_MUSIC = "youtube_music"
+    YOUTUBE = "youtube"
+    SOUNDCLOUD = "soundcloud"

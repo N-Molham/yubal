@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from yubal import Source
 
 from yubal_api.db.subscription import SubscriptionType
 from yubal_api.schemas.jobs import YouTubeMusicUrl
@@ -32,6 +33,7 @@ class SubscriptionResponse(BaseModel):
     enabled: bool
     max_items: int | None
     thumbnail_url: str | None = Field(default=None, json_schema_extra={"format": "uri"})
+    platform: Source
     created_at: UTCDateTime
     last_synced_at: UTCDateTime | None
 

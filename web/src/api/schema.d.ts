@@ -411,6 +411,8 @@ export interface components {
             audio_bitrate: number | null;
             /** @default playlist */
             kind: components["schemas"]["ContentKind"];
+            /** @default null */
+            platform: components["schemas"]["Source"] | null;
         };
         /**
          * ContentKind
@@ -519,6 +521,8 @@ export interface components {
              * @default null
              */
             download_ugc: boolean | null;
+            /** @default null */
+            platform: components["schemas"]["Source"] | null;
             /**
              * Subscription Id
              * @default null
@@ -839,6 +843,18 @@ export interface components {
          */
         SkipReason: "file_exists" | "unsupported_video_type" | "ugc" | "no_video_id" | "region_unavailable";
         /**
+         * Source
+         * @description User-facing platform a piece of content came from.
+         *
+         *     A display/classification concept, not a 1:1 mirror of the provider
+         *     registry — YOUTUBE_MUSIC and YOUTUBE both route through the same
+         *     YouTubeMusicProvider/extraction pipeline (see providers.registry), but
+         *     users pasting a plain youtube.com link expect a "YouTube" label, not
+         *     "YouTube Music".
+         * @enum {string}
+         */
+        Source: "youtube_music" | "youtube" | "soundcloud";
+        /**
          * SubscriptionCounts
          * @description Subscription count statistics.
          */
@@ -896,6 +912,7 @@ export interface components {
              * Format: uri
              */
             thumbnail_url?: string | null;
+            platform: components["schemas"]["Source"];
             /**
              * Created At
              * Format: date-time

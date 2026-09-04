@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from yubal import ContentKind, parse_playlist_id
+from yubal import ContentKind, classify_source, parse_playlist_id
 from yubal.client import YTMusicClient
 from yubal.exceptions import PlaylistNotFoundError
 from yubal.models.ytmusic import Playlist
@@ -129,6 +129,7 @@ class PlaylistInfoService:
             url=url,
             thumbnail_url=info.get("thumbnail"),
             kind=kind,
+            platform=classify_source(url),
         )
 
     def _get_playlist_content_info(self, url: str) -> ContentInfo:
@@ -149,6 +150,7 @@ class PlaylistInfoService:
             thumbnail_url=cls.thumbnail_url
             or (playlist.thumbnails[-1].url if playlist.thumbnails else None),
             kind=cls.kind,
+            platform=classify_source(url),
         )
 
     def _classify(self, playlist: Playlist) -> "_Classification":
@@ -212,4 +214,5 @@ class PlaylistInfoService:
             url=url,
             thumbnail_url=(track.thumbnails[-1].url if track.thumbnails else None),
             kind=ContentKind.TRACK,
+            platform=classify_source(url),
         )

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-from yubal import AudioCodec, ContentKind, PhaseStats
+from yubal import AudioCodec, ContentKind, PhaseStats, Source
 
 from yubal_api.domain.enums import JobSource, JobStatus
 
@@ -22,6 +22,7 @@ class ContentInfo(BaseModel):
     audio_codec: str | None = None  # e.g. "opus", "mp3"
     audio_bitrate: int | None = None  # kbps, e.g. 128
     kind: ContentKind = ContentKind.PLAYLIST
+    platform: Source | None = None  # which service this came from
 
 
 class Job(BaseModel):
@@ -34,6 +35,7 @@ class Job(BaseModel):
     audio_format: AudioCodec = AudioCodec.OPUS
     max_items: int | None = None
     download_ugc: bool | None = None
+    platform: Source | None = None  # which service this came from
     subscription_id: UUID | None = None
     source: JobSource = JobSource.MANUAL
     status: JobStatus = JobStatus.PENDING

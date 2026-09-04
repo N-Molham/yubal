@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from uuid import UUID
 
-from yubal import AudioCodec, PhaseStats
+from yubal import AudioCodec, PhaseStats, classify_source
 
 from yubal_api.domain.enums import JobSource, JobStatus
 from yubal_api.domain.job import ContentInfo, Job
@@ -99,6 +99,7 @@ class JobStore:
                 audio_format=audio_format,
                 max_items=max_items,
                 download_ugc=download_ugc,
+                platform=classify_source(url),
                 subscription_id=subscription_id,
                 source=source,
             )
