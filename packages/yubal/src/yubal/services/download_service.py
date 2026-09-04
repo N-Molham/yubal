@@ -20,6 +20,7 @@ from yubal.models.enums import DownloadStatus, MatchResult, SkipReason
 from yubal.models.progress import DownloadProgress
 from yubal.models.results import DownloadResult
 from yubal.models.track import TrackMetadata
+from yubal.providers.youtube_music import YouTubeMusicProvider
 from yubal.services.lyrics import (
     LrclibFetcher,
     LyricsFetcher,
@@ -81,7 +82,6 @@ class YTDLPDownloader:
     - Capture of actual output path (which may differ from template)
     """
 
-    YOUTUBE_MUSIC_URL = "https://music.youtube.com/watch?v={video_id}"
     MAX_RETRIES: int = 3
     RETRY_BASE_DELAY: float = 1.0  # seconds, doubles each retry (1s, 2s, 4s)
 
@@ -99,6 +99,7 @@ class YTDLPDownloader:
         """
         self._config = config
         self._cookies_path = cookies_path
+        self._provider = YouTubeMusicProvider()
 
         if cookies_path and cookies_path.exists():
             logger.info("Using cookies for yt-dlp downloads")
@@ -212,7 +213,7 @@ class YTDLPDownloader:
 
         try:
             opts = self._build_yt_dlp_options(output_path, temp_cookies)
-            url = self.YOUTUBE_MUSIC_URL.format(video_id=video_id)
+            url = self._provider.resolve_download_url(video_id)
 
             logger.debug("Downloading %s to %s", video_id, output_path)
 
