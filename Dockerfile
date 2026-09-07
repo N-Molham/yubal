@@ -38,17 +38,16 @@ WORKDIR /app
 
 # Install runtime dependencies, then create the non-root user.
 #
-# ffmpeg, deno, and rsgain are NOT baked in here — entrypoint.sh fetches
-# them into /app/config/bin/ (a persistent volume mount) on first boot
-# instead. That trades a slower first start for a much smaller image:
+# ffmpeg, deno, and rsgain are NOT baked in here — entrypoint.sh installs
+# them under /app/config/ (a persistent volume mount) on first boot instead.
+# That trades a slower first start for a much smaller image:
 #   - ffmpeg/deno are 80MB+ static binaries each, bigger than everything
 #     else in this image combined.
-#   - rsgain's own Alpine package (`apk add rsgain`) links against a full
-#     shared ffmpeg build transitively — pulls in ~90MB of libav*/codec
-#     packages, defeating the point of fetching a *minimal* ffmpeg above.
-#     Its own generic-Linux release (a 5MB static-ish binary, amd64 only —
-#     matching the original Dockerfile's own amd64-only scope, not a new
-#     restriction) avoids that entirely.
+#   - rsgain ships only a glibc-dynamically-linked Linux release (its
+#     "static" build still links glibc), which cannot run on this image's
+#     musl libc, and its Alpine package transitively pulls in a full shared
+#     ffmpeg (~90MB). entrypoint.sh installs rsgain via apk into a
+#     persistent root under /app/config — musl-native, x86_64 and arm64.
 # curl/tar/xz/unzip stay installed (not removed after) because
 # entrypoint.sh needs them at runtime to do these fetches.
 RUN set -eux \

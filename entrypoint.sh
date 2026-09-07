@@ -5,6 +5,7 @@ PUID=${PUID:-1000}
 PGID=${PGID:-1000}
 
 BIN_DIR=/app/config/bin
+APK_ROOT=/app/config/apk
 
 warn_chown() {
     path=$1
@@ -85,32 +86,34 @@ fetch_deno_if_missing() {
     echo "deno fetched."
 }
 
-# Only used for ReplayGain tagging — downloads are not otherwise affected
-# if this fetch fails (best-effort, non-fatal). amd64 only: rsgain's own
-# generic-Linux release doesn't publish an arm64 build (same restriction
-# the original Dockerfile had for its .deb install, not a new one).
-fetch_rsgain_if_missing() {
-    if [ -x "$BIN_DIR/rsgain" ]; then
+# Only used for ReplayGain tagging — downloads are not otherwise affected if
+# this fails (best-effort, non-fatal). rsgain ships only a glibc-dynamically-
+# linked Linux release, which cannot run on this image's musl libc, so Alpine's
+# own musl-native rsgain package is installed via apk into a persistent root
+# under /app/config (apk installs to /usr otherwise, which does not survive
+# container recreation). A thin wrapper in $BIN_DIR sets LD_LIBRARY_PATH so only
+# rsgain sees the apk-root libraries. Works on x86_64 and arm64 alike.
+install_rsgain_if_missing() {
+    if [ -x "$APK_ROOT/usr/bin/rsgain" ]; then
         return 0
     fi
 
-    if [ "$(uname -m)" != "x86_64" ]; then
-        return 0
-    fi
-
-    local version=3.8
-    echo "Fetching rsgain (first boot only, cached in $BIN_DIR)..."
-    local tmp=/tmp/rsgain.tar.xz
-    if ! curl -fsSL --retry 3 --retry-delay 5 -o "$tmp" \
-        "https://github.com/complexlogic/rsgain/releases/download/v${version}/rsgain-${version}-Linux.tar.xz"; then
-        echo "Warning: failed to download rsgain. ReplayGain tagging will be unavailable" >&2
+    echo "Installing rsgain (first boot only, cached in $APK_ROOT)..."
+    mkdir -p "$APK_ROOT/etc/apk" "$BIN_DIR"
+    cp -r /etc/apk/keys "$APK_ROOT/etc/apk/" 2>/dev/null || true
+    cp /etc/apk/repositories "$APK_ROOT/etc/apk/repositories" 2>/dev/null || true
+    if ! apk --root "$APK_ROOT" --initdb --no-cache add rsgain; then
+        echo "Warning: failed to install rsgain. ReplayGain tagging will be unavailable" >&2
         echo "until this succeeds on a later boot; downloads themselves are unaffected." >&2
         return 0
     fi
-    tar -xJf "$tmp" --strip-components=1 -C "$BIN_DIR" "rsgain-${version}-Linux/rsgain"
-    rm -f "$tmp"
+
+    cat > "$BIN_DIR/rsgain" <<'EOF'
+#!/bin/sh
+LD_LIBRARY_PATH="/app/config/apk/usr/lib:/app/config/apk/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" exec /app/config/apk/usr/bin/rsgain "$@"
+EOF
     chmod +x "$BIN_DIR/rsgain"
-    echo "rsgain fetched."
+    echo "rsgain installed."
 }
 
 case "$PUID" in
@@ -136,7 +139,7 @@ if [ "$(id -u)" = "0" ]; then
     # clear error until it fetches successfully on a later boot.
     fetch_ffmpeg_if_missing || true
     fetch_deno_if_missing || true
-    fetch_rsgain_if_missing || true
+    install_rsgain_if_missing || true
 
     # Fix ownership (non-recursive on /app/data to avoid slow startup with large libraries)
     chown "$PUID:$PGID" /app/data || warn_chown /app/data
@@ -150,5 +153,5 @@ fi
 mkdir -p /app/config/yubal /app/config/ytdlp "$BIN_DIR" /app/data 2>/dev/null || true
 fetch_ffmpeg_if_missing || true
 fetch_deno_if_missing || true
-fetch_rsgain_if_missing || true
+install_rsgain_if_missing || true
 exec "$@"

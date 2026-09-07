@@ -127,7 +127,7 @@ This fork has no GitHub Actions CI/CD — images are built and pushed manually v
 - `scripts/build-run.sh` — local build + run, no registry involved. Good for iterating on Dockerfile/entrypoint changes.
 - `scripts/build-deploy.sh` — builds and pushes to `ghcr.io/<owner>/<repo>` (derived from your `origin` remote). Defaults to a multi-arch (`linux/amd64,linux/arm64`) push via `docker buildx` — required for the image to run correctly regardless of which architecture pulls it. Pass `--single-arch` for a faster host-arch-only build when just iterating locally. Run `scripts/build-deploy.sh --help`-equivalent (read the script's header comment) for the full flag list.
 
-ffmpeg, deno, and rsgain are not baked into the image — `entrypoint.sh` fetches each into `/app/config/bin/` (a persistent volume mount) on first boot only, keeping the pushed image small.
+ffmpeg, deno, and rsgain are not baked into the image — `entrypoint.sh` fetches ffmpeg/deno into `/app/config/bin/` and installs rsgain via apk into `/app/config/apk/` (both persistent volume mounts) on first boot only, keeping the pushed image small. First boot needs network access to the Alpine CDN and downloads ~100MB of rsgain dependencies into the config volume; later boots reuse the cached install.
 
 ## ⚙️ Configuration
 
