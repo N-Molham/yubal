@@ -3,25 +3,7 @@
 name: cd
 
 on:
-  push:
-    branches: [master, next]
-    tags: ["v*"]
-    paths-ignore:
-      - "*.md"
-      - "docs/**"
-      - "LICENSE"
-      - ".gitignore"
-      - ".vscode/**"
-      - ".git/**"
-      - ".editorconfig"
-      - ".prettierrc"
-      - ".env.example"
-      - ".env.dev"
-      - "tests/**"
-      - "CLAUDE.md"
-      - ".mcp.json"
-      - ".claude/**"
-      - "extension/**"
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io

@@ -5,12 +5,7 @@ permissions:
   contents: read
 
 on:
-  push:
-    branches: [master, next]
-    paths-ignore: ["extension/**"]
-  pull_request:
-    branches: [master, next]
-    paths-ignore: ["extension/**"]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
