@@ -18,9 +18,13 @@ from yubal_api.settings import Settings
 
 
 class FakeClient:
-    def __init__(self, playlists: list[dict]) -> None:
+    def __init__(self, playlists: list[dict], *, authenticated: bool = True) -> None:
         self._playlists = playlists
+        self._authenticated = authenticated
         self.calls = 0
+
+    def check_authenticated(self) -> bool:
+        return self._authenticated
 
     def get_library_playlists(self) -> list[dict]:
         self.calls += 1
@@ -35,6 +39,7 @@ def _service(
     liked: bool = True,
     saved: bool = True,
     cookies: bool = True,
+    authenticated: bool = True,
     liked_max_items: int | None = None,
 ) -> tuple[LibrarySyncService, SubscriptionService, FakeClient]:
     repository = SubscriptionRepository(engine)
@@ -48,7 +53,7 @@ def _service(
         ),
     )
     subscription_service = SubscriptionService(repository, MagicMock())
-    client = FakeClient(playlists or [])
+    client = FakeClient(playlists or [], authenticated=authenticated)
     cookies_path = tmp_path / "cookies.txt"
     if cookies:
         cookies_path.write_text("# Netscape HTTP Cookie File\n")
@@ -183,6 +188,18 @@ class TestLibrarySync:
 
         library = subscriptions.list(origin=SubscriptionOrigin.LIBRARY)
         assert library[0].enabled is False
+
+    def test_unauthenticated_cookies_create_nothing(
+        self, engine: Engine, tmp_path: Path
+    ) -> None:
+        service, subscriptions, client = _service(engine, tmp_path, authenticated=False)
+
+        result = service.sync()
+
+        assert result.error is not None
+        assert "not authenticated" in result.error
+        assert subscriptions.list() == []
+        assert client.calls == 0
 
     def test_missing_cookies_reports_error_without_rows(
         self, engine: Engine, tmp_path: Path

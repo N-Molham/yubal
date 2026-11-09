@@ -326,6 +326,20 @@ class YTMusicClient:
 
         return [SearchResult.model_validate(r) for r in data]
 
+    def check_authenticated(self) -> bool:
+        """Best-effort server-side auth probe using the account menu.
+
+        Catches cookies YouTube silently treats as signed out (stale PSIDTS,
+        wrong account) that a local ``auth_type`` check cannot detect.
+        """
+        if not self._is_authenticated():
+            return False
+        try:
+            info = self._ytm.get_account_info()
+        except (YTMusicError, KeyError, TypeError):
+            return False
+        return bool(isinstance(info, Mapping) and info.get("accountName"))
+
     def get_library_playlists(self) -> list[dict[str, Any]]:
         """Fetch the playlists saved in the authenticated user's library.
 

@@ -39,6 +39,8 @@ PLAYLIST_URL_TEMPLATE = "https://music.youtube.com/playlist?list={playlist_id}"
 class LibraryClient(Protocol):
     """Minimal YTMusic client surface used by discovery."""
 
+    def check_authenticated(self) -> bool: ...
+
     def get_library_playlists(self) -> list[dict[str, Any]]: ...
 
 
@@ -86,6 +88,17 @@ class LibrarySyncService:
         result = LibrarySyncResult()
         existing = self._existing_by_playlist_id()
         client = self._client_factory(cookies_path=self._cookies_path)
+
+        # Stale cookies can still produce auth headers while YouTube treats
+        # the session as signed out. Probe before creating any auto
+        # subscription, otherwise a broken LM row would be queued every run.
+        if not client.check_authenticated():
+            return LibrarySyncResult(
+                error=(
+                    "YouTube Music cookies are not authenticated (YouTube "
+                    "returned a sign-in page). Re-export and upload cookies."
+                )
+            )
 
         if config.auto_sync_liked:
             self._ensure_liked_subscription(existing, config, result)
