@@ -151,6 +151,18 @@ ffmpeg, deno, and rsgain are not baked into the image — `entrypoint.sh` fetche
 | `YUBAL_BASE_PATH`                  | URL base path for reverse proxy subfolder                  | —                |
 | `YUBAL_TZ`                         | Timezone (IANA format)                                     | `UTC`            |
 
+### Settings page
+
+The web UI **Settings** page overrides the matching `YUBAL_*` environment
+defaults for the next job or scheduler tick: audio format and quality, lyrics
+lookup, ASCII filenames, UGC downloads, ReplayGain, scheduler enabled/cron/job
+timeout, and library auto-sync. Overrides are stored in the database, so they
+survive restarts.
+
+Paths, bind address, CORS, log level, timezone and debug flags stay
+environment-only and are displayed read-only under **Environment**; changing
+them requires restarting with new values.
+
 ### Library auto-sync
 
 With cookies uploaded, **Settings** can keep content from your YouTube Music
