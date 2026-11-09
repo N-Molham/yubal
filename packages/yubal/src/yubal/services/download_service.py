@@ -112,8 +112,24 @@ class YTDLPDownloader:
         else:
             logger.info("No cookies configured for yt-dlp downloads")
 
+    def _format_selectors(self) -> list[str]:
+        """Ordered format preferences, ending with the most permissive fallback.
+
+        ``bestaudio/best`` still requires an audio-only or muxed format; the
+        last selector accepts a video stream and lets FFmpeg extract audio.
+        """
+        codec = self._config.codec.value
+        return [
+            f"bestaudio[ext={codec}]/bestaudio[acodec={codec}]/bestaudio/best",
+            "bestaudio/best",
+            "bestvideo*+bestaudio/best",
+        ]
+
     def _build_yt_dlp_options(
-        self, output_path: Path, cookies_override: Path | None = None
+        self,
+        output_path: Path,
+        cookies_override: Path | None = None,
+        format_selector: str | None = None,
     ) -> dict[str, Any]:
         """Build yt-dlp options for audio extraction and post-processing.
 
@@ -130,11 +146,8 @@ class YTDLPDownloader:
         Returns:
             Dictionary of yt-dlp options.
         """
-        codec = self._config.codec.value
         opts: dict[str, Any] = {
-            "format": (
-                f"bestaudio[ext={codec}]/bestaudio[acodec={codec}]/bestaudio/best"
-            ),
+            "format": format_selector or self._format_selectors()[0],
             "outtmpl": str(output_path),
             "color": "never",  # Disable ANSI codes in error messages
             "postprocessors": [
@@ -218,7 +231,11 @@ class YTDLPDownloader:
             shutil.copy2(self._cookies_path, temp_cookies)
 
         try:
-            opts = self._build_yt_dlp_options(output_path, temp_cookies)
+            selectors = self._format_selectors()
+            selector_index = 0
+            opts = self._build_yt_dlp_options(
+                output_path, temp_cookies, selectors[selector_index]
+            )
             url = self._provider.resolve_download_url(video_id)
 
             logger.debug("Downloading %s to %s", video_id, output_path)
@@ -273,6 +290,22 @@ class YTDLPDownloader:
                             f"Authentication required for {video_id}. "
                             "Try providing a cookies.txt file."
                         ) from e
+
+                    # Requested formats can be missing on some videos (e.g.
+                    # audio-only formats not exposed for this client). Fall
+                    # back to progressively more permissive selectors before
+                    # failing the track.
+                    if "Requested format is not available" in error_msg:
+                        if selector_index + 1 < len(selectors):
+                            selector_index += 1
+                            opts["format"] = selectors[selector_index]
+                            self._cleanup_partial_downloads(output_path)
+                            logger.warning(
+                                "Format unavailable for %s; retrying with '%s'",
+                                video_id,
+                                selectors[selector_index],
+                            )
+                            continue
 
                     # Retryable transient errors (403, 429, 5xx)
                     if self._is_retryable_error(error_msg):

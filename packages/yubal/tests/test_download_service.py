@@ -632,6 +632,102 @@ class TestYTDLPDownloaderRetry:
         assert call_count == 4  # Initial + 3 retries
         assert "after 4 attempts" in str(exc_info.value)
 
+    def test_falls_back_to_bestaudio_on_format_unavailable(
+        self, download_config: DownloadConfig, tmp_path: Path
+    ) -> None:
+        """Should retry with bestaudio/best when the codec selector misses."""
+        downloader = YTDLPDownloader(download_config)
+        output_path = tmp_path / "test_track"
+        formats: list[str] = []
+        call_count = 0
+
+        def mock_download(urls: list[str]) -> None:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("Requested format is not available")
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            Path(f"{output_path}.opus").touch()
+
+        class FakeYDL:
+            def __init__(self, opts: dict) -> None:
+                formats.append(opts["format"])
+
+            def __enter__(self) -> "FakeYDL":
+                return self
+
+            def __exit__(self, *args: object) -> bool:
+                return False
+
+            def download(self, urls: list[str]) -> None:
+                mock_download(urls)
+
+        with patch("yt_dlp.YoutubeDL", FakeYDL):
+            result = downloader.download("test_video_id", output_path)
+
+        assert formats[0] == (
+            "bestaudio[ext=opus]/bestaudio[acodec=opus]/bestaudio/best"
+        )
+        assert formats[1] == "bestaudio/best"
+        assert result.exists()
+
+    def test_falls_back_to_video_audio_on_format_unavailable(
+        self, download_config: DownloadConfig, tmp_path: Path
+    ) -> None:
+        """Last-resort fallback accepts a video stream for audio extraction."""
+        downloader = YTDLPDownloader(download_config)
+        output_path = tmp_path / "test_track"
+        formats: list[str] = []
+        call_count = 0
+
+        def mock_download(urls: list[str]) -> None:
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise Exception("Requested format is not available")
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            Path(f"{output_path}.opus").touch()
+
+        class FakeYDL:
+            def __init__(self, opts: dict) -> None:
+                formats.append(opts["format"])
+
+            def __enter__(self) -> "FakeYDL":
+                return self
+
+            def __exit__(self, *args: object) -> bool:
+                return False
+
+            def download(self, urls: list[str]) -> None:
+                mock_download(urls)
+
+        with patch("yt_dlp.YoutubeDL", FakeYDL):
+            downloader.download("test_video_id", output_path)
+
+        assert formats[-1] == "bestvideo*+bestaudio/best"
+
+    def test_format_unavailable_exhausts_fallbacks(
+        self, download_config: DownloadConfig, tmp_path: Path
+    ) -> None:
+        """Should fail after all format selectors are exhausted."""
+        downloader = YTDLPDownloader(download_config)
+        output_path = tmp_path / "test_track"
+        call_count = 0
+
+        def mock_download(urls: list[str]) -> None:
+            nonlocal call_count
+            call_count += 1
+            raise Exception("Requested format is not available")
+
+        with patch("yt_dlp.YoutubeDL") as mock_ydl:
+            mock_instance = mock_ydl.return_value.__enter__.return_value
+            mock_instance.download = mock_download
+
+            with pytest.raises(DownloadError):
+                downloader.download("test_video_id", output_path)
+
+        assert call_count == 3  # One per selector; no transient retry loop
+
     def test_no_retry_for_video_unavailable(
         self, download_config: DownloadConfig, tmp_path: Path
     ) -> None:
