@@ -6,7 +6,7 @@ from fastapi import APIRouter, status
 
 from yubal_api.api.deps import SchedulerDep, SubscriptionServiceDep
 from yubal_api.api.exceptions import QueueFullError
-from yubal_api.db.subscription import SubscriptionType
+from yubal_api.db.subscription import SubscriptionOrigin, SubscriptionType
 from yubal_api.schemas.subscriptions import (
     SubscriptionCreate,
     SubscriptionListResponse,
@@ -43,9 +43,10 @@ def list_subscriptions(
     service: SubscriptionServiceDep,
     enabled: bool | None = None,
     type: SubscriptionType | None = None,
+    origin: SubscriptionOrigin | None = None,
 ) -> SubscriptionListResponse:
     """List all subscriptions."""
-    subscriptions = service.list(enabled=enabled, type=type)
+    subscriptions = service.list(enabled=enabled, type=type, origin=origin)
     return SubscriptionListResponse(
         items=[SubscriptionResponse.model_validate(s) for s in subscriptions]
     )

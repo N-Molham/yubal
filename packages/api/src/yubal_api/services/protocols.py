@@ -6,7 +6,12 @@ from uuid import UUID
 
 from yubal import AudioCodec, PhaseStats
 
-from yubal_api.db.subscription import Subscription, SubscriptionFields, SubscriptionType
+from yubal_api.db.subscription import (
+    Subscription,
+    SubscriptionFields,
+    SubscriptionOrigin,
+    SubscriptionType,
+)
 from yubal_api.domain.enums import JobSource, JobStatus
 from yubal_api.domain.job import ContentInfo, Job
 
@@ -71,6 +76,7 @@ class SubscriptionRepository(Protocol):
         *,
         enabled: bool | None = None,
         type: SubscriptionType | None = None,
+        origin: SubscriptionOrigin | None = None,
     ) -> list[Subscription]: ...
 
     def get(self, id: UUID) -> Subscription | None: ...
@@ -88,4 +94,5 @@ class SubscriptionRepository(Protocol):
         *,
         enabled: bool | None = None,
         type: SubscriptionType | None = None,
+        origin: SubscriptionOrigin | None = None,
     ) -> int: ...

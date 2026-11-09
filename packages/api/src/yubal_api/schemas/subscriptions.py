@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 from yubal import Source, classify_source
 
-from yubal_api.db.subscription import SubscriptionType
+from yubal_api.db.subscription import SubscriptionOrigin, SubscriptionType
 from yubal_api.schemas.jobs import YouTubeMusicUrl
 from yubal_api.schemas.types import UTCDateTime
 
@@ -35,6 +35,7 @@ class SubscriptionUpdate(BaseModel):
     """Request to update a subscription."""
 
     enabled: bool | None = None
+    max_items: int | None = Field(default=None, ge=1, le=10000)
 
 
 class SubscriptionResponse(BaseModel):
@@ -49,6 +50,7 @@ class SubscriptionResponse(BaseModel):
     thumbnail_url: str | None = Field(default=None, json_schema_extra={"format": "uri"})
     platform: Source
     is_podcast: bool
+    origin: SubscriptionOrigin
     created_at: UTCDateTime
     last_synced_at: UTCDateTime | None
 

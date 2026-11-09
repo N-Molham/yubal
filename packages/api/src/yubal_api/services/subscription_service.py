@@ -19,7 +19,12 @@ from yubal_api.api.exceptions import (
     SubscriptionConflictError,
     SubscriptionNotFoundError,
 )
-from yubal_api.db.subscription import Subscription, SubscriptionFields, SubscriptionType
+from yubal_api.db.subscription import (
+    Subscription,
+    SubscriptionFields,
+    SubscriptionOrigin,
+    SubscriptionType,
+)
 from yubal_api.services.playlist_info_service import PlaylistInfoService
 from yubal_api.services.protocols import SubscriptionRepository
 
@@ -48,8 +53,9 @@ class SubscriptionService:
         *,
         enabled: bool | None = None,
         type: SubscriptionType | None = None,
+        origin: SubscriptionOrigin | None = None,
     ) -> list[Subscription]:
-        return self._repository.list(enabled=enabled, type=type)
+        return self._repository.list(enabled=enabled, type=type, origin=origin)
 
     def get(self, subscription_id: UUID) -> Subscription:
         sub = self._repository.get(subscription_id)
@@ -97,6 +103,34 @@ class SubscriptionService:
         )
         return self._repository.create(subscription)
 
+    def create_auto(
+        self,
+        url: str,
+        name: str,
+        origin: SubscriptionOrigin,
+        *,
+        thumbnail_url: str | None = None,
+        max_items: int | None = None,
+    ) -> Subscription:
+        """Create a subscription discovered from the user's library.
+
+        Unlike :meth:`create`, this does not fetch metadata (discovery already
+        has title/thumbnail) and is only called for rows confirmed missing.
+        """
+        subscription = Subscription(
+            type=SubscriptionType.PLAYLIST,
+            url=url,
+            name=name[:200],
+            thumbnail_url=thumbnail_url,
+            platform=classify_source(url) or Source.YOUTUBE_MUSIC,
+            origin=origin,
+            is_podcast=False,
+            enabled=True,
+            max_items=max_items,
+            created_at=datetime.now(UTC),
+        )
+        return self._repository.create(subscription)
+
     def update(self, subscription_id: UUID, fields: SubscriptionFields) -> Subscription:
         if not fields:
             return self.get(subscription_id)
@@ -110,8 +144,9 @@ class SubscriptionService:
         *,
         enabled: bool | None = None,
         type: SubscriptionType | None = None,
+        origin: SubscriptionOrigin | None = None,
     ) -> int:
-        return self._repository.count(enabled=enabled, type=type)
+        return self._repository.count(enabled=enabled, type=type, origin=origin)
 
     def delete(self, subscription_id: UUID) -> None:
         if not self._repository.delete(subscription_id):
