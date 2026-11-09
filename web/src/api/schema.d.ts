@@ -333,6 +333,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Library Sync Settings
+         * @description Get effective library auto-sync settings.
+         */
+        get: operations["get_library_sync_settings_api_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Library Sync Settings
+         * @description Update library auto-sync settings.
+         *
+         *     When either toggle ends up enabled, discovery runs immediately so the
+         *     playlist list (and the next sync) reflects the library without waiting
+         *     for the scheduler.
+         */
+        patch: operations["update_library_sync_settings_api_settings_patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -907,6 +935,34 @@ export interface components {
             items: components["schemas"]["SubscriptionResponse"][];
         };
         /**
+         * LibrarySyncSettingsResponse
+         * @description Effective library auto-sync settings.
+         */
+        LibrarySyncSettingsResponse: {
+            /** Auto Sync Liked */
+            auto_sync_liked: boolean;
+            /** Auto Sync Saved Playlists */
+            auto_sync_saved_playlists: boolean;
+            /** Max Jobs Per Run */
+            max_jobs_per_run: number;
+            /** Liked Max Items */
+            liked_max_items: number | null;
+        };
+        /**
+         * LibrarySyncSettingsUpdate
+         * @description Partial update for library auto-sync settings.
+         */
+        LibrarySyncSettingsUpdate: {
+            /** Auto Sync Liked */
+            auto_sync_liked?: boolean | null;
+            /** Auto Sync Saved Playlists */
+            auto_sync_saved_playlists?: boolean | null;
+            /** Max Jobs Per Run */
+            max_jobs_per_run?: number | null;
+            /** Liked Max Items */
+            liked_max_items?: number | null;
+        };
+        /**
          * SubscriptionResponse
          * @description Subscription response.
          */
@@ -936,6 +992,7 @@ export interface components {
             platform: components["schemas"]["Source"];
             /** Is Podcast */
             is_podcast: boolean;
+            origin: components["schemas"]["SubscriptionOrigin"];
             /**
              * Created At
              * Format: date-time
@@ -944,6 +1001,16 @@ export interface components {
             /** Last Synced At */
             last_synced_at: string | null;
         };
+        /**
+         * SubscriptionOrigin
+         * @description Where a subscription came from.
+         *
+         *     ``MANUAL`` rows are created by the user. ``LIKED``/``LIBRARY`` rows are
+         *     discovered from the authenticated YouTube Music library and are paused
+         *     when their corresponding auto-sync toggle is off.
+         * @enum {string}
+         */
+        SubscriptionOrigin: "manual" | "liked" | "library";
         /**
          * SubscriptionType
          * @description Type of content subscription.
@@ -957,6 +1024,8 @@ export interface components {
         SubscriptionUpdate: {
             /** Enabled */
             enabled?: boolean | null;
+            /** Max Items */
+            max_items?: number | null;
         };
         /**
          * SyncResponse
@@ -1615,6 +1684,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SchedulerStatus"];
+                };
+            };
+        };
+    };
+    get_library_sync_settings_api_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibrarySyncSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_library_sync_settings_api_settings_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LibrarySyncSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibrarySyncSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -18,6 +18,7 @@ import {
   ListMusicIcon,
   MenuIcon,
   RocketIcon,
+  SettingsIcon,
   StarIcon,
   XIcon,
 } from "lucide-react";
@@ -26,6 +27,7 @@ import { useEffect, useState } from "react";
 const navItems = [
   { label: "Downloads", startIcon: DownloadIcon, href: "/" },
   { label: "My playlists", startIcon: ListMusicIcon, href: "/playlists" },
+  { label: "Settings", startIcon: SettingsIcon, href: "/settings" },
 ];
 
 export function Header() {
