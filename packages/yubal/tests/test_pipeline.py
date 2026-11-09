@@ -212,6 +212,126 @@ class TestDownloadTrack:
         # Verify extract() was called (unified API for all URL types)
         mock_extractor.extract.assert_called_once()
 
+    def test_single_track_playlist_skips_m3u(
+        self,
+        single_track_metadata: TrackMetadata,
+        single_track_playlist_info: PlaylistInfo,
+        tmp_path: Path,
+    ) -> None:
+        """A playlist source resolving to one track should behave like a track."""
+        config = PlaylistDownloadConfig(
+            download=DownloadConfig(base_path=tmp_path),
+            generate_m3u=True,
+            save_cover=True,
+            apply_replaygain=False,
+        )
+        playlist_info = single_track_playlist_info.model_copy(
+            update={"kind": ContentKind.PLAYLIST}
+        )
+        extract_progress = ExtractProgress(
+            current=1,
+            total=1,
+            playlist_total=1,
+            skipped_by_reason={},
+            track=single_track_metadata,
+            playlist_info=playlist_info,
+        )
+
+        mock_extractor = MagicMock()
+        mock_extractor.extract.return_value = iter([extract_progress])
+
+        mock_downloader = MagicMock()
+        mock_downloader.download_tracks.return_value = iter(
+            [
+                DownloadProgress(
+                    current=1,
+                    total=1,
+                    result=DownloadResult(
+                        track=single_track_metadata,
+                        status=DownloadStatus.SUCCESS,
+                        output_path=tmp_path / "test.opus",
+                    ),
+                )
+            ]
+        )
+
+        mock_composer = MagicMock()
+        mock_composer.compose.return_value = ArtifactPaths()
+
+        service = PlaylistDownloadService(
+            config=config,
+            extractor=mock_extractor,
+            downloader=mock_downloader,
+            composer=mock_composer,
+        )
+
+        list(service.download_playlist("https://music.youtube.com/playlist?list=PLone"))
+
+        composed_info = mock_composer.compose.call_args.args[1]
+        assert composed_info.kind == ContentKind.TRACK
+
+    def test_multi_track_playlist_keeps_playlist_kind(
+        self,
+        single_track_metadata: TrackMetadata,
+        single_track_playlist_info: PlaylistInfo,
+        tmp_path: Path,
+    ) -> None:
+        """A real multi-track playlist must still produce an M3U (kind kept)."""
+        config = PlaylistDownloadConfig(
+            download=DownloadConfig(base_path=tmp_path),
+            generate_m3u=True,
+            save_cover=True,
+            apply_replaygain=False,
+        )
+        playlist_info = single_track_playlist_info.model_copy(
+            update={"kind": ContentKind.PLAYLIST}
+        )
+        progresses = [
+            ExtractProgress(
+                current=n,
+                total=2,
+                playlist_total=2,
+                skipped_by_reason={},
+                track=single_track_metadata,
+                playlist_info=playlist_info,
+            )
+            for n in (1, 2)
+        ]
+
+        mock_extractor = MagicMock()
+        mock_extractor.extract.return_value = iter(progresses)
+
+        mock_downloader = MagicMock()
+        mock_downloader.download_tracks.return_value = iter(
+            [
+                DownloadProgress(
+                    current=n,
+                    total=2,
+                    result=DownloadResult(
+                        track=single_track_metadata,
+                        status=DownloadStatus.SUCCESS,
+                        output_path=tmp_path / f"{n}.opus",
+                    ),
+                )
+                for n in (1, 2)
+            ]
+        )
+
+        mock_composer = MagicMock()
+        mock_composer.compose.return_value = ArtifactPaths()
+
+        service = PlaylistDownloadService(
+            config=config,
+            extractor=mock_extractor,
+            downloader=mock_downloader,
+            composer=mock_composer,
+        )
+
+        list(service.download_playlist("https://music.youtube.com/playlist?list=PLtwo"))
+
+        composed_info = mock_composer.compose.call_args.args[1]
+        assert composed_info.kind == ContentKind.PLAYLIST
+
 
 class TestPodcastKindOverride:
     """Tests for content_kind_override=PODCAST_EPISODE rewriting playlist_info."""

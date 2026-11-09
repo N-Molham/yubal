@@ -213,6 +213,7 @@ class PlaylistDownloadService:
             # Phase 1: Extract metadata (all URL types: track, album, playlist)
             extracted_tracks: list[TrackMetadata] = []
             playlist_info: PlaylistInfo | None = None
+            playlist_total: int | None = None
 
             for progress, extract_progress in self._extract_phase(
                 url, cancel_token, extractor=extractor, cache=cache
@@ -222,6 +223,7 @@ class PlaylistDownloadService:
                     if cache is not None:
                         cache.add(extract_progress.track)
                 playlist_info = extract_progress.playlist_info
+                playlist_total = extract_progress.playlist_total
                 yield progress
 
             # Early exit if no tracks found
@@ -241,6 +243,17 @@ class PlaylistDownloadService:
             ):
                 playlist_info = playlist_info.model_copy(
                     update={"kind": ContentKind.PODCAST_EPISODE}
+                )
+
+            # A playlist-shaped source whose *source* has exactly one track is
+            # a single-track download in practice: don't write a one-entry M3U
+            # (or a playlist cover) for it. Using the source's track total
+            # (before skips) keeps the M3U for a multi-track playlist that only
+            # yields one available track. Albums already skip the M3U and use
+            # album gain for ReplayGain, so they are left alone.
+            if playlist_info.kind == ContentKind.PLAYLIST and playlist_total == 1:
+                playlist_info = playlist_info.model_copy(
+                    update={"kind": ContentKind.TRACK}
                 )
 
             # Phase 2: Download tracks to disk
