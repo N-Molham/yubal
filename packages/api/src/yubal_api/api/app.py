@@ -194,6 +194,7 @@ def create_services(
         subscription_service=subscription_service,
         cache_path=settings.cache_path,
         job_timeout=settings.job_timeout_seconds,
+        runtime_settings=runtime_settings,
     )
 
     # Create scheduler

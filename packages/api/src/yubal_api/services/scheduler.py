@@ -39,6 +39,7 @@ class Scheduler:
         self._runtime_settings = runtime_settings
         self._task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
+        self._wake_event = asyncio.Event()
         self._next_run_at: datetime | None = None
 
     @property
@@ -48,13 +49,13 @@ class Scheduler:
 
     @property
     def enabled(self) -> bool:
-        """Check if scheduler is enabled (from settings)."""
-        return self._settings.scheduler_enabled
+        """Check if the scheduler is enabled (runtime-editable)."""
+        return self._runtime_settings.get().scheduler_enabled
 
     @property
     def cron_expression(self) -> str:
-        """Get cron expression (from settings)."""
-        return self._settings.scheduler_cron
+        """Get the cron expression (runtime-editable)."""
+        return self._runtime_settings.get().scheduler_cron
 
     @property
     def next_run_at(self) -> datetime | None:
@@ -64,18 +65,23 @@ class Scheduler:
     def _get_next_run_time(self) -> datetime:
         """Calculate next run time using croniter in configured timezone."""
         tz = self._settings.timezone
-        cron = croniter(self._settings.scheduler_cron, datetime.now(tz))
+        cron = croniter(self.cron_expression, datetime.now(tz))
         next_time = cron.get_next(datetime)
         # Convert to UTC for storage/comparison
         if next_time.tzinfo is None:
             next_time = next_time.replace(tzinfo=tz)
         return next_time.astimezone(UTC)
 
+    def notify_settings_changed(self) -> None:
+        """Wake the loop so cron/enabled changes apply immediately."""
+        self._wake_event.set()
+
     def start(self) -> None:
         """Start the scheduler background task."""
         if self._task is not None:
             return
         self._stop_event.clear()
+        self._wake_event.clear()
         self._task = asyncio.create_task(self._run_loop())
         logger.info("Scheduler started")
 
@@ -84,6 +90,7 @@ class Scheduler:
         if self._task is None:
             return
         self._stop_event.set()
+        self._wake_event.set()
         self._task.cancel()
         try:
             await self._task
@@ -97,19 +104,26 @@ class Scheduler:
         """Main scheduler loop."""
         while not self._stop_event.is_set():
             next_run = self._get_next_run_time()
-            self._next_run_at = next_run if self._settings.scheduler_enabled else None
+            self._next_run_at = next_run if self.enabled else None
             wait_seconds = (next_run - datetime.now(UTC)).total_seconds()
 
+            self._wake_event.clear()
+            timed_out = False
             try:
                 await asyncio.wait_for(
-                    self._stop_event.wait(),
+                    self._wake_event.wait(),
                     timeout=max(0, wait_seconds),
                 )
-                break  # Stop event was set
             except TimeoutError:
-                pass  # Timeout expired, time to sync
+                timed_out = True
 
-            if self._settings.scheduler_enabled:
+            if self._stop_event.is_set():
+                break
+            if not timed_out:
+                # Settings changed; recompute the next run with new cron/enabled.
+                continue
+
+            if self.enabled:
                 await self._refresh_library()
                 await self._sync_all_enabled()
 

@@ -13,6 +13,7 @@ from yubal import AudioCodec, CancelToken, cleanup_part_files
 from yubal_api.domain.enums import JobSource, JobStatus, ProgressStep
 from yubal_api.domain.job import ContentInfo, Job
 from yubal_api.services.protocols import JobExecutionStore
+from yubal_api.services.runtime_settings import RuntimeSettingsService
 from yubal_api.services.subscription_service import SubscriptionService
 from yubal_api.services.sync_service import SyncService
 
@@ -56,6 +57,7 @@ class JobExecutor:
         subscription_service: SubscriptionService | None = None,
         cache_path: Path | None = None,
         job_timeout: float = 1800,
+        runtime_settings: RuntimeSettingsService | None = None,
     ) -> None:
         """Initialize the job executor.
 
@@ -88,6 +90,7 @@ class JobExecutor:
         self._subscription_service = subscription_service
         self._cache_path = cache_path
         self._job_timeout = job_timeout
+        self._runtime_settings = runtime_settings
 
         # Track background tasks to prevent GC during execution
         self._background_tasks: set[asyncio.Task[Any]] = set()
@@ -124,7 +127,11 @@ class JobExecutor:
         """
         result = self._job_store.create(
             url,
-            self._audio_format,
+            (
+                self._runtime_settings.get().audio_format
+                if self._runtime_settings is not None
+                else self._audio_format
+            ),
             max_items,
             source,
             subscription_id,
@@ -207,13 +214,18 @@ class JobExecutor:
         """Background task that runs the sync operation."""
         cancel_token = CancelToken()
         self._cancel_tokens[job_id] = cancel_token
+        config = (
+            self._runtime_settings.get() if self._runtime_settings is not None else None
+        )
 
         try:
             # Check cancellation before starting (CancelToken is single source of truth)
             if cancel_token.is_cancelled:
                 return
 
-            async with asyncio.timeout(self._job_timeout):
+            async with asyncio.timeout(
+                config.job_timeout_seconds if config else self._job_timeout
+            ):
                 self._job_store.transition(
                     job_id,
                     JobStatus.FETCHING_INFO,
@@ -254,15 +266,27 @@ class JobExecutor:
                 # Run sync in thread pool
                 sync_service = SyncService(
                     self._base_path,
-                    self._audio_format,
+                    config.audio_format if config else self._audio_format,
                     self._cookies_path,
-                    self._fetch_lyrics,
-                    self._ytmusic_lyrics_fallback,
-                    self._apply_replaygain,
-                    self._ascii_filenames,
-                    download_ugc if download_ugc is not None else self._download_ugc,
+                    config.fetch_lyrics if config else self._fetch_lyrics,
+                    (
+                        config.ytmusic_lyrics_fallback
+                        if config
+                        else self._ytmusic_lyrics_fallback
+                    ),
+                    config.replaygain if config else self._apply_replaygain,
+                    config.ascii_filenames if config else self._ascii_filenames,
+                    (
+                        config.download_ugc
+                        if config
+                        else (
+                            download_ugc
+                            if download_ugc is not None
+                            else self._download_ugc
+                        )
+                    ),
                     self._cache_path,
-                    self._audio_quality,
+                    config.audio_quality if config else self._audio_quality,
                     is_podcast,
                 )
                 result = await asyncio.to_thread(

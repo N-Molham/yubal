@@ -1,27 +1,60 @@
 """Tests for the scheduler service."""
 
 from datetime import UTC, datetime
+from typing import Any, cast
 from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
 
 import pytest
+from yubal import AudioCodec
 from yubal_api.db.subscription import Subscription, SubscriptionOrigin, SubscriptionType
-from yubal_api.services.runtime_settings import LibrarySyncSettings
+from yubal_api.services.runtime_settings import RuntimeSettings
 from yubal_api.services.scheduler import Scheduler
+
+
+def _runtime(**overrides: Any) -> RuntimeSettings:
+    values: dict[str, Any] = {
+        "audio_format": AudioCodec.OPUS,
+        "audio_quality": 0,
+        "fetch_lyrics": True,
+        "ytmusic_lyrics_fallback": True,
+        "ascii_filenames": False,
+        "download_ugc": False,
+        "replaygain": True,
+        "scheduler_enabled": True,
+        "scheduler_cron": "0 0 * * *",
+        "job_timeout_seconds": 1800,
+        "auto_sync_liked": False,
+        "auto_sync_saved_playlists": False,
+        "max_jobs_per_run": 25,
+        "liked_max_items": None,
+    }
+    values.update(overrides)
+    return RuntimeSettings(**values)
+
+
+def _make_scheduler(
+    settings: MagicMock,
+    runtime: RuntimeSettings,
+    *,
+    subscription_service: MagicMock | None = None,
+    job_executor: MagicMock | None = None,
+) -> Scheduler:
+    runtime_settings = MagicMock()
+    runtime_settings.get.return_value = runtime
+    return Scheduler(
+        subscription_service or MagicMock(),
+        job_executor or MagicMock(),
+        settings,
+        library_sync=MagicMock(),
+        runtime_settings=runtime_settings,
+    )
 
 
 @pytest.fixture
 def scheduler(mock_settings: MagicMock) -> Scheduler:
     """Create scheduler with mocked dependencies."""
-    subscription_service = MagicMock()
-    job_executor = MagicMock()
-    return Scheduler(
-        subscription_service,
-        job_executor,
-        mock_settings,
-        library_sync=MagicMock(),
-        runtime_settings=MagicMock(),
-    )
+    return _make_scheduler(mock_settings, _runtime())
 
 
 class TestGetNextRunTime:
@@ -31,7 +64,9 @@ class TestGetNextRunTime:
         self, scheduler: Scheduler, mock_settings: MagicMock
     ) -> None:
         """Should calculate next run time and return in UTC."""
-        mock_settings.scheduler_cron = "0 * * * *"  # Every hour
+        cast(Any, scheduler._runtime_settings).get.return_value = _runtime(
+            scheduler_cron="0 * * * *"  # Every hour
+        )
         mock_settings.timezone = ZoneInfo("UTC")
 
         next_run = scheduler._get_next_run_time()
@@ -49,7 +84,9 @@ class TestGetNextRunTime:
         # Set timezone to UTC+1
         tz = ZoneInfo("Europe/Paris")
         mock_settings.timezone = tz
-        mock_settings.scheduler_cron = "0 */6 * * *"  # Every 6 hours
+        cast(Any, scheduler._runtime_settings).get.return_value = _runtime(
+            scheduler_cron="0 */6 * * *"  # Every 6 hours
+        )
 
         next_run = scheduler._get_next_run_time()
 
@@ -66,7 +103,9 @@ class TestGetNextRunTime:
         self, scheduler: Scheduler, mock_settings: MagicMock
     ) -> None:
         """Should always return a future time."""
-        mock_settings.scheduler_cron = "* * * * *"  # Every minute
+        cast(Any, scheduler._runtime_settings).get.return_value = _runtime(
+            scheduler_cron="* * * * *"  # Every minute
+        )
         mock_settings.timezone = ZoneInfo("UTC")
 
         next_run = scheduler._get_next_run_time()
@@ -77,32 +116,18 @@ class TestGetNextRunTime:
         self, mock_settings: MagicMock
     ) -> None:
         """Same cron in different timezones should produce different UTC times."""
-        subscription_service = MagicMock()
-        job_executor = MagicMock()
-
         # Scheduler with UTC
         mock_settings.timezone = ZoneInfo("UTC")
-        mock_settings.scheduler_cron = "0 12 * * *"  # Noon
-        scheduler_utc = Scheduler(
-            subscription_service,
-            job_executor,
-            mock_settings,
-            library_sync=MagicMock(),
-            runtime_settings=MagicMock(),
+        scheduler_utc = _make_scheduler(
+            mock_settings, _runtime(scheduler_cron="0 12 * * *")
         )
         next_utc = scheduler_utc._get_next_run_time()
 
         # Scheduler with Tokyo (UTC+9)
         mock_settings_tokyo = MagicMock()
-        mock_settings_tokyo.scheduler_enabled = True
-        mock_settings_tokyo.scheduler_cron = "0 12 * * *"  # Noon
         mock_settings_tokyo.timezone = ZoneInfo("Asia/Tokyo")
-        scheduler_tokyo = Scheduler(
-            subscription_service,
-            job_executor,
-            mock_settings_tokyo,
-            library_sync=MagicMock(),
-            runtime_settings=MagicMock(),
+        scheduler_tokyo = _make_scheduler(
+            mock_settings_tokyo, _runtime(scheduler_cron="0 12 * * *")
         )
         next_tokyo = scheduler_tokyo._get_next_run_time()
 
@@ -140,19 +165,15 @@ def _scheduler_with(
     subscription_service.list.return_value = subscriptions
     job_executor = MagicMock()
     job_executor.create_and_start_job.return_value = MagicMock(id="job")
-    runtime_settings = MagicMock()
-    runtime_settings.get.return_value = LibrarySyncSettings(
-        auto_sync_liked=liked,
-        auto_sync_saved_playlists=saved,
-        max_jobs_per_run=max_jobs,
-        liked_max_items=None,
-    )
-    scheduler = Scheduler(
-        subscription_service,
-        job_executor,
+    scheduler = _make_scheduler(
         mock_settings or MagicMock(),
-        library_sync=MagicMock(),
-        runtime_settings=runtime_settings,
+        _runtime(
+            auto_sync_liked=liked,
+            auto_sync_saved_playlists=saved,
+            max_jobs_per_run=max_jobs,
+        ),
+        subscription_service=subscription_service,
+        job_executor=job_executor,
     )
     return scheduler, job_executor
 
