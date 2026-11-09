@@ -131,21 +131,45 @@ ffmpeg, deno, and rsgain are not baked into the image — `entrypoint.sh` fetche
 
 ## ⚙️ Configuration
 
-| Variable                        | Description                                       | Default (Docker) |
-| ------------------------------- | ------------------------------------------------- | ---------------- |
-| `PUID`                          | User ID for file ownership                        | `1000`           |
-| `PGID`                          | Group ID for file ownership                       | `1000`           |
-| `YUBAL_AUDIO_FORMAT`            | `opus`, `mp3`, or `m4a`                           | `opus`           |
-| `YUBAL_AUDIO_QUALITY`           | Transcode quality (0=best, 10=worst)              | `0`              |
-| `YUBAL_SCHEDULER_ENABLED`       | Enable automatic scheduled sync                   | `true`           |
-| `YUBAL_SCHEDULER_CRON`          | Cron schedule for auto-sync                       | `0 0 * * *`      |
-| `YUBAL_FETCH_LYRICS`            | Fetch lyrics from lrclib.net                      | `true`           |
-| `YUBAL_YTMUSIC_LYRICS_FALLBACK` | Fall back to YouTube Music lyrics on lrclib miss  | `true`           |
-| `YUBAL_DOWNLOAD_UGC`            | Download user-generated content to `_Unofficial/` | `false`          |
-| `YUBAL_REPLAYGAIN`              | Apply track gain; album gain for complete albums  | `true`           |
-| `YUBAL_JOB_TIMEOUT_SECONDS`     | Job execution timeout in seconds                  | `1800`           |
-| `YUBAL_BASE_PATH`               | URL base path for reverse proxy subfolder         | —                |
-| `YUBAL_TZ`                      | Timezone (IANA format)                            | `UTC`            |
+| Variable                           | Description                                                | Default (Docker) |
+| ---------------------------------- | ---------------------------------------------------------- | ---------------- |
+| `PUID`                             | User ID for file ownership                                 | `1000`           |
+| `PGID`                             | Group ID for file ownership                                | `1000`           |
+| `YUBAL_AUDIO_FORMAT`               | `opus`, `mp3`, or `m4a`                                    | `opus`           |
+| `YUBAL_AUDIO_QUALITY`              | Transcode quality (0=best, 10=worst)                       | `0`              |
+| `YUBAL_SCHEDULER_ENABLED`          | Enable automatic scheduled sync                            | `true`           |
+| `YUBAL_SCHEDULER_CRON`             | Cron schedule for auto-sync                                | `0 0 * * *`      |
+| `YUBAL_AUTO_SYNC_LIKED`            | Default: sync Liked Music (UI-editable)                    | `false`          |
+| `YUBAL_AUTO_SYNC_SAVED_PLAYLISTS`  | Default: sync saved library playlists (UI-editable)        | `false`          |
+| `YUBAL_AUTO_SYNC_MAX_JOBS_PER_RUN` | Max auto-sync jobs created per scheduler run               | `25`             |
+| `YUBAL_AUTO_SYNC_LIKED_MAX_ITEMS`  | Optional cap for the auto-created Liked Music subscription | —                |
+| `YUBAL_FETCH_LYRICS`               | Fetch lyrics from lrclib.net                               | `true`           |
+| `YUBAL_YTMUSIC_LYRICS_FALLBACK`    | Fall back to YouTube Music lyrics on lrclib miss           | `true`           |
+| `YUBAL_DOWNLOAD_UGC`               | Download user-generated content to `_Unofficial/`          | `false`          |
+| `YUBAL_REPLAYGAIN`                 | Apply track gain; album gain for complete albums           | `true`           |
+| `YUBAL_JOB_TIMEOUT_SECONDS`        | Job execution timeout in seconds                           | `1800`           |
+| `YUBAL_BASE_PATH`                  | URL base path for reverse proxy subfolder                  | —                |
+| `YUBAL_TZ`                         | Timezone (IANA format)                                     | `UTC`            |
+
+### Library auto-sync
+
+With cookies uploaded, **Settings** can keep content from your YouTube Music
+library in sync automatically:
+
+- **Sync Liked Music** — creates one `Liked Music` subscription (`list=LM`).
+- **Sync saved playlists** — discovers playlists saved in your library and
+  creates one subscription per playlist, marked **Auto**.
+
+Both defaults can also be set with `YUBAL_AUTO_SYNC_LIKED` /
+`YUBAL_AUTO_SYNC_SAVED_PLAYLISTS`; values saved in the web UI override the
+environment. Turning a toggle off pauses its Auto subscriptions without
+deleting them or re-enabling playlists you disabled yourself.
+
+Discovery runs at startup, when settings are saved, and before each scheduler
+run. Automatic runs are capped by `YUBAL_AUTO_SYNC_MAX_JOBS_PER_RUN` (default 25) and pick never-synced/oldest subscriptions first, so large libraries
+rotate over consecutive runs. A very large Liked Music first sync can exceed
+`YUBAL_JOB_TIMEOUT_SECONDS`; completed tracks are kept and later runs skip
+them.
 
 <details>
 <summary>All options</summary>
