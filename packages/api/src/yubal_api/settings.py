@@ -118,6 +118,28 @@ class Settings(BaseSettings):
         description="Cron expression for scheduled sync",
     )
 
+    # Library auto-sync defaults (runtime-overridable via the web UI)
+    auto_sync_liked: bool = Field(
+        default=False,
+        description="Auto-sync the authenticated user's Liked Music playlist",
+    )
+    auto_sync_saved_playlists: bool = Field(
+        default=False,
+        description="Auto-sync playlists saved in the authenticated user's library",
+    )
+    auto_sync_max_jobs_per_run: int = Field(
+        default=25,
+        ge=1,
+        le=200,
+        description="Maximum scheduler jobs created per run (oldest-synced first)",
+    )
+    auto_sync_liked_max_items: int | None = Field(
+        default=None,
+        ge=1,
+        le=10000,
+        description="Optional cap for the auto-created Liked Music subscription",
+    )
+
     # Job execution
     job_timeout_seconds: int = Field(
         default=1800,
