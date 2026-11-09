@@ -326,6 +326,39 @@ class YTMusicClient:
 
         return [SearchResult.model_validate(r) for r in data]
 
+    def get_library_playlists(self) -> list[dict[str, Any]]:
+        """Fetch the playlists saved in the authenticated user's library.
+
+        Requires authentication (cookies). Each entry is ytmusicapi's raw
+        format: ``playlistId``, ``title``, ``thumbnails``, ``count``, ``owned``.
+
+        Raises:
+            AuthenticationRequiredError: If cookies are missing/expired.
+            UpstreamAPIError: If the API request fails.
+        """
+        if not self._is_authenticated():
+            raise AuthenticationRequiredError(
+                "YouTube Music cookies are required to read saved playlists."
+            )
+
+        logger.debug("Fetching library playlists")
+        try:
+            data = self._ytm.get_library_playlists(limit=None)
+        except (YTMusicServerError, YTMusicUserError) as e:
+            message = str(e)
+            if "auth" in message.lower() or "sign in" in message.lower():
+                raise AuthenticationRequiredError(
+                    "YouTube Music authentication failed while reading saved "
+                    "playlists. Re-export and upload cookies while logged in."
+                ) from e
+            logger.warning("YTMusic API error fetching library playlists: %s", e)
+            raise UpstreamAPIError(f"Failed to fetch library playlists: {e}") from e
+        except YTMusicError as e:
+            logger.warning("YTMusic error fetching library playlists: %s", e)
+            raise UpstreamAPIError(f"Failed to fetch library playlists: {e}") from e
+
+        return list(data or [])
+
     def get_track(self, video_id: str) -> PlaylistTrack:
         """Fetch a single track by video ID using get_watch_playlist().
 
