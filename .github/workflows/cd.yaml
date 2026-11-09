@@ -102,7 +102,7 @@ jobs:
             echo "" >> CHANGES.md
             echo "---" >> CHANGES.md
             echo "" >> CHANGES.md
-            echo "Built by @guillevc · **Full Changelog**: [\`${prev}...${GITHUB_REF_NAME}\`](https://github.com/${{ github.repository }}/compare/${prev}...${GITHUB_REF_NAME})" >> CHANGES.md
+            echo "**Full Changelog**: [\`${prev}...${GITHUB_REF_NAME}\`](https://github.com/${{ github.repository }}/compare/${prev}...${GITHUB_REF_NAME})" >> CHANGES.md
           fi
         env:
           GIT_CLIFF_OUTPUT: CHANGES.md
