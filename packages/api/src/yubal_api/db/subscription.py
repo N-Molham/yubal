@@ -16,12 +16,26 @@ class SubscriptionType(StrEnum):
     # ARTIST = "artist"  # future
 
 
+class SubscriptionOrigin(StrEnum):
+    """Where a subscription came from.
+
+    ``MANUAL`` rows are created by the user. ``LIKED``/``LIBRARY`` rows are
+    discovered from the authenticated YouTube Music library and are paused
+    when their corresponding auto-sync toggle is off.
+    """
+
+    MANUAL = "manual"
+    LIKED = "liked"
+    LIBRARY = "library"
+
+
 class SubscriptionFields(TypedDict, total=False):
     """Partial update fields for a subscription."""
 
     enabled: bool
     name: str
     thumbnail_url: str | None
+    max_items: int | None
     last_synced_at: datetime
 
 
@@ -39,5 +53,6 @@ class Subscription(SQLModel, table=True):
     thumbnail_url: str | None = Field(default=None, max_length=2048)
     platform: Source = Field(default=Source.YOUTUBE_MUSIC)
     is_podcast: bool = Field(default=False)
+    origin: SubscriptionOrigin = Field(default=SubscriptionOrigin.MANUAL)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_synced_at: datetime | None = Field(default=None)

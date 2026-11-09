@@ -5,7 +5,12 @@ from uuid import UUID
 from sqlalchemy import Engine
 from sqlmodel import Session, col, select
 
-from yubal_api.db.subscription import Subscription, SubscriptionFields, SubscriptionType
+from yubal_api.db.subscription import (
+    Subscription,
+    SubscriptionFields,
+    SubscriptionOrigin,
+    SubscriptionType,
+)
 
 
 class SubscriptionRepository:
@@ -20,6 +25,7 @@ class SubscriptionRepository:
         *,
         enabled: bool | None = None,
         type: SubscriptionType | None = None,
+        origin: SubscriptionOrigin | None = None,
     ) -> list[Subscription]:
         """List subscriptions with optional filters."""
         with Session(self._engine) as session:
@@ -28,6 +34,8 @@ class SubscriptionRepository:
                 stmt = stmt.where(Subscription.enabled == enabled)
             if type is not None:
                 stmt = stmt.where(Subscription.type == type)
+            if origin is not None:
+                stmt = stmt.where(Subscription.origin == origin)
             return list(session.exec(stmt).all())
 
     def get(self, id: UUID) -> Subscription | None:
@@ -76,6 +84,7 @@ class SubscriptionRepository:
         *,
         enabled: bool | None = None,
         type: SubscriptionType | None = None,
+        origin: SubscriptionOrigin | None = None,
     ) -> int:
         """Count subscriptions with optional filters."""
         from sqlmodel import func
@@ -86,4 +95,6 @@ class SubscriptionRepository:
                 stmt = stmt.where(Subscription.enabled == enabled)
             if type is not None:
                 stmt = stmt.where(Subscription.type == type)
+            if origin is not None:
+                stmt = stmt.where(Subscription.origin == origin)
             return session.exec(stmt).one()
