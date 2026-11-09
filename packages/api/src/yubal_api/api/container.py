@@ -12,7 +12,9 @@ from fastapi import Request
 from yubal_api.services.job_event_bus import JobEventBus
 from yubal_api.services.job_executor import JobExecutor
 from yubal_api.services.job_store import JobStore
+from yubal_api.services.library_sync_service import LibrarySyncService
 from yubal_api.services.log_buffer import LogBuffer
+from yubal_api.services.runtime_settings import RuntimeSettingsService
 from yubal_api.services.scheduler import Scheduler
 from yubal_api.services.shutdown_coordinator import ShutdownCoordinator
 from yubal_api.services.subscription_service import SubscriptionService
@@ -32,6 +34,8 @@ class Services:
     job_executor: JobExecutor
     shutdown_coordinator: ShutdownCoordinator
     subscription_service: SubscriptionService
+    runtime_settings: RuntimeSettingsService
+    library_sync: LibrarySyncService
     scheduler: Scheduler
     job_event_bus: JobEventBus
     log_buffer: LogBuffer

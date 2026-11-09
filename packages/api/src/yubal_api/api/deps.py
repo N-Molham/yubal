@@ -20,8 +20,10 @@ from yubal_api.api.container import Services, get_services
 from yubal_api.services.job_event_bus import JobEventBus
 from yubal_api.services.job_executor import JobExecutor
 from yubal_api.services.job_store import JobStore
+from yubal_api.services.library_sync_service import LibrarySyncService
 from yubal_api.services.log_buffer import LogBuffer
 from yubal_api.services.playlist_info_service import PlaylistInfoService
+from yubal_api.services.runtime_settings import RuntimeSettingsService
 from yubal_api.services.scheduler import Scheduler
 from yubal_api.services.subscription_service import SubscriptionService
 from yubal_api.settings import Settings, get_settings
@@ -61,6 +63,20 @@ SchedulerDep = Annotated[Scheduler, Depends(_get_scheduler)]
 SubscriptionServiceDep = Annotated[
     SubscriptionService, Depends(_get_subscription_service)
 ]
+
+
+def _get_runtime_settings(services: ServicesDep) -> RuntimeSettingsService:
+    """Get runtime settings service from services container."""
+    return services.runtime_settings
+
+
+def _get_library_sync(services: ServicesDep) -> LibrarySyncService:
+    """Get library sync service from services container."""
+    return services.library_sync
+
+
+RuntimeSettingsDep = Annotated[RuntimeSettingsService, Depends(_get_runtime_settings)]
+LibrarySyncDep = Annotated[LibrarySyncService, Depends(_get_library_sync)]
 
 
 def _get_job_event_bus(services: ServicesDep) -> JobEventBus:

@@ -39,7 +39,14 @@ from yubal_api.api.routes import (
     scheduler,
     subscriptions,
 )
-from yubal_api.db import SubscriptionRepository, create_db_engine
+from yubal_api.api.routes import (
+    settings as settings_routes,
+)
+from yubal_api.db import (
+    SettingsRepository,
+    SubscriptionRepository,
+    create_db_engine,
+)
 from yubal_api.schemas.jobs import (
     ClearedEvent,
     CreatedEvent,
@@ -51,8 +58,10 @@ from yubal_api.schemas.logs import LogEntry
 from yubal_api.services.job_event_bus import JobEventBus
 from yubal_api.services.job_executor import JobExecutor
 from yubal_api.services.job_store import JobStore
+from yubal_api.services.library_sync_service import LibrarySyncService
 from yubal_api.services.log_buffer import BufferHandler, LogBuffer
 from yubal_api.services.playlist_info_service import PlaylistInfoService
+from yubal_api.services.runtime_settings import RuntimeSettingsService
 from yubal_api.services.scheduler import Scheduler
 from yubal_api.services.shutdown_coordinator import ShutdownCoordinator
 from yubal_api.services.subscription_service import SubscriptionService
@@ -125,11 +134,15 @@ def run_migrations() -> None:
     command.upgrade(alembic_cfg, "head")
 
 
-def create_services(repository: SubscriptionRepository) -> Services:
+def create_services(
+    repository: SubscriptionRepository,
+    settings_repository: SettingsRepository,
+) -> Services:
     """Create all application services with proper dependency wiring.
 
     Args:
         repository: Repository for subscription database operations.
+        settings_repository: Repository for runtime setting overrides.
 
     Returns:
         Services container with all application services.
@@ -160,6 +173,12 @@ def create_services(repository: SubscriptionRepository) -> Services:
         repository=repository,
         playlist_info=playlist_info,
     )
+    runtime_settings = RuntimeSettingsService(settings_repository, settings)
+    library_sync = LibrarySyncService(
+        subscription_service,
+        runtime_settings,
+        cookies_path=cookies_path,
+    )
 
     job_executor = JobExecutor(
         job_store=job_store,
@@ -182,6 +201,8 @@ def create_services(repository: SubscriptionRepository) -> Services:
         subscription_service=subscription_service,
         job_executor=job_executor,
         settings=settings,
+        library_sync=library_sync,
+        runtime_settings=runtime_settings,
     )
 
     # Wire up coordinator with executor
@@ -192,6 +213,8 @@ def create_services(repository: SubscriptionRepository) -> Services:
         job_executor=job_executor,
         shutdown_coordinator=shutdown_coordinator,
         subscription_service=subscription_service,
+        runtime_settings=runtime_settings,
+        library_sync=library_sync,
         scheduler=scheduler_service,
         job_event_bus=job_event_bus,
         log_buffer=log_buffer,
@@ -209,6 +232,7 @@ def create_api_router() -> APIRouter:
     api_router.include_router(cookies.router)
     api_router.include_router(subscriptions.router)
     api_router.include_router(scheduler.router)
+    api_router.include_router(settings_routes.router)
     return api_router
 
 
@@ -228,9 +252,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Create services with database repository
     repository = SubscriptionRepository(engine)
-    services = create_services(repository)
+    settings_repository = SettingsRepository(engine)
+    services = create_services(repository, settings_repository)
     app.state.services = services
     logger.info("Services initialized")
+
+    # Discover library content once at startup so the UI reflects it without
+    # waiting for the first cron tick. Only creates subscriptions; jobs run on
+    # the normal schedule.
+    try:
+        result = await asyncio.to_thread(services.library_sync.sync)
+    except Exception:
+        logger.exception("Initial library discovery failed")
+    else:
+        if result.error:
+            logger.warning("Initial library discovery: %s", result.error)
 
     # Start scheduler
     services.scheduler.start()

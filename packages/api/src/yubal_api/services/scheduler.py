@@ -8,9 +8,11 @@ from uuid import UUID
 from croniter import croniter
 
 from yubal_api.api.exceptions import SubscriptionNotFoundError
-from yubal_api.db.subscription import Subscription
+from yubal_api.db.subscription import Subscription, SubscriptionOrigin
 from yubal_api.domain.enums import JobSource
 from yubal_api.services.job_executor import JobExecutor
+from yubal_api.services.library_sync_service import LibrarySyncService
+from yubal_api.services.runtime_settings import RuntimeSettingsService
 from yubal_api.services.subscription_service import SubscriptionService
 from yubal_api.settings import Settings
 
@@ -25,11 +27,16 @@ class Scheduler:
         subscription_service: SubscriptionService,
         job_executor: JobExecutor,
         settings: Settings,
+        *,
+        library_sync: LibrarySyncService,
+        runtime_settings: RuntimeSettingsService,
     ) -> None:
         """Initialize scheduler."""
         self._subscription_service = subscription_service
         self._job_executor = job_executor
         self._settings = settings
+        self._library_sync = library_sync
+        self._runtime_settings = runtime_settings
         self._task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
         self._next_run_at: datetime | None = None
@@ -103,6 +110,7 @@ class Scheduler:
                 pass  # Timeout expired, time to sync
 
             if self._settings.scheduler_enabled:
+                await self._refresh_library()
                 await self._sync_all_enabled()
 
     def _create_jobs_for_subscriptions(
@@ -144,10 +152,59 @@ class Scheduler:
         return job_ids
 
     async def _sync_all_enabled(self) -> list[str]:
-        """Sync all enabled subscriptions (async wrapper)."""
-        return self._create_jobs_for_subscriptions(
-            self._subscription_service.list(enabled=True)
+        """Sync enabled subscriptions allowed by the current toggles."""
+        return self._sync_enabled_subscriptions()
+
+    def _allowed_subscriptions(self) -> list[Subscription]:
+        """Enabled subscriptions allowed by the current toggles, oldest first."""
+        config = self._runtime_settings.get()
+        allowed = {SubscriptionOrigin.MANUAL}
+        if config.auto_sync_liked:
+            allowed.add(SubscriptionOrigin.LIKED)
+        if config.auto_sync_saved_playlists:
+            allowed.add(SubscriptionOrigin.LIBRARY)
+
+        subscriptions = [
+            subscription
+            for subscription in self._subscription_service.list(enabled=True)
+            if subscription.origin in allowed
+        ]
+        subscriptions.sort(
+            key=lambda subscription: (
+                subscription.last_synced_at is not None,
+                (
+                    subscription.last_synced_at.timestamp()
+                    if subscription.last_synced_at
+                    else 0.0
+                ),
+            )
         )
+        return subscriptions
+
+    def _sync_enabled_subscriptions(self) -> list[str]:
+        """Create jobs for allowed subscriptions, capped for scheduler runs."""
+        subscriptions = self._allowed_subscriptions()
+        limited = subscriptions[: self._runtime_settings.get().max_jobs_per_run]
+        if len(limited) < len(subscriptions):
+            logger.info(
+                "Scheduler job cap reached: syncing %d of %d subscriptions",
+                len(limited),
+                len(subscriptions),
+            )
+        return self._create_jobs_for_subscriptions(limited)
+
+    async def _refresh_library(self) -> None:
+        """Discover library content before syncing (best-effort)."""
+        config = self._runtime_settings.get()
+        if not (config.auto_sync_liked or config.auto_sync_saved_playlists):
+            return
+        try:
+            result = await asyncio.to_thread(self._library_sync.sync)
+        except Exception:
+            logger.exception("Library discovery failed")
+            return
+        if result.error:
+            logger.warning("Library discovery: %s", result.error)
 
     def sync_subscription(self, subscription_id: UUID) -> str | None:
         """Create sync job for a single subscription. Returns job_id or None."""
@@ -160,7 +217,9 @@ class Scheduler:
         return job_ids[0] if job_ids else None
 
     def sync_all(self) -> list[str]:
-        """Create sync jobs for all enabled subscriptions. Returns job_ids."""
-        return self._create_jobs_for_subscriptions(
-            self._subscription_service.list(enabled=True)
-        )
+        """Create sync jobs for all allowed enabled subscriptions.
+
+        Manual "sync all" is not capped; the scheduler's per-run cap only
+        applies to automatic runs.
+        """
+        return self._create_jobs_for_subscriptions(self._allowed_subscriptions())
