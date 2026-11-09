@@ -344,7 +344,7 @@ export interface paths {
          * Get Library Sync Settings
          * @description Get effective library auto-sync settings.
          */
-        get: operations["get_library_sync_settings_api_settings_get"];
+        get: operations["get_settings_api_settings_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -358,7 +358,7 @@ export interface paths {
          *     playlist list (and the next sync) reflects the library without waiting
          *     for the scheduler.
          */
-        patch: operations["update_library_sync_settings_api_settings_patch"];
+        patch: operations["update_settings_api_settings_patch"];
         trace?: never;
     };
 }
@@ -935,10 +935,59 @@ export interface components {
             items: components["schemas"]["SubscriptionResponse"][];
         };
         /**
-         * LibrarySyncSettingsResponse
-         * @description Effective library auto-sync settings.
+         * EnvironmentSettings
+         * @description Environment-only settings, shown in the UI but restart-required.
          */
-        LibrarySyncSettingsResponse: {
+        EnvironmentSettings: {
+            /** Root */
+            root: string;
+            /** Data */
+            data: string;
+            /** Config */
+            config: string;
+            /** Base Path */
+            base_path: string;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /** Reload */
+            reload: boolean;
+            /** Debug */
+            debug: boolean;
+            /** Log Level */
+            log_level: string;
+            /** Temp */
+            temp: string;
+            /** Cors Origins */
+            cors_origins: string[];
+            /** Tz */
+            tz: string;
+        };
+        /**
+         * SettingsResponse
+         * @description Effective runtime settings plus the read-only environment block.
+         */
+        SettingsResponse: {
+            audio_format: components["schemas"]["AudioCodec"];
+            /** Audio Quality */
+            audio_quality: number;
+            /** Fetch Lyrics */
+            fetch_lyrics: boolean;
+            /** Ytmusic Lyrics Fallback */
+            ytmusic_lyrics_fallback: boolean;
+            /** Ascii Filenames */
+            ascii_filenames: boolean;
+            /** Download Ugc */
+            download_ugc: boolean;
+            /** Replaygain */
+            replaygain: boolean;
+            /** Scheduler Enabled */
+            scheduler_enabled: boolean;
+            /** Scheduler Cron */
+            scheduler_cron: string;
+            /** Job Timeout Seconds */
+            job_timeout_seconds: number;
             /** Auto Sync Liked */
             auto_sync_liked: boolean;
             /** Auto Sync Saved Playlists */
@@ -947,12 +996,32 @@ export interface components {
             max_jobs_per_run: number;
             /** Liked Max Items */
             liked_max_items: number | null;
+            environment: components["schemas"]["EnvironmentSettings"];
         };
         /**
-         * LibrarySyncSettingsUpdate
-         * @description Partial update for library auto-sync settings.
+         * SettingsUpdate
+         * @description Partial update for runtime-editable settings.
          */
-        LibrarySyncSettingsUpdate: {
+        SettingsUpdate: {
+            audio_format?: components["schemas"]["AudioCodec"] | null;
+            /** Audio Quality */
+            audio_quality?: number | null;
+            /** Fetch Lyrics */
+            fetch_lyrics?: boolean | null;
+            /** Ytmusic Lyrics Fallback */
+            ytmusic_lyrics_fallback?: boolean | null;
+            /** Ascii Filenames */
+            ascii_filenames?: boolean | null;
+            /** Download Ugc */
+            download_ugc?: boolean | null;
+            /** Replaygain */
+            replaygain?: boolean | null;
+            /** Scheduler Enabled */
+            scheduler_enabled?: boolean | null;
+            /** Scheduler Cron */
+            scheduler_cron?: string | null;
+            /** Job Timeout Seconds */
+            job_timeout_seconds?: number | null;
             /** Auto Sync Liked */
             auto_sync_liked?: boolean | null;
             /** Auto Sync Saved Playlists */
@@ -1688,7 +1757,7 @@ export interface operations {
             };
         };
     };
-    get_library_sync_settings_api_settings_get: {
+    get_settings_api_settings_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1703,7 +1772,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LibrarySyncSettingsResponse"];
+                    "application/json": components["schemas"]["SettingsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1717,7 +1786,7 @@ export interface operations {
             };
         };
     };
-    update_library_sync_settings_api_settings_patch: {
+    update_settings_api_settings_patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -1726,7 +1795,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LibrarySyncSettingsUpdate"];
+                "application/json": components["schemas"]["SettingsUpdate"];
             };
         };
         responses: {
@@ -1736,7 +1805,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LibrarySyncSettingsResponse"];
+                    "application/json": components["schemas"]["SettingsResponse"];
                 };
             };
             /** @description Validation Error */
