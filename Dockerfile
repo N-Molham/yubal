@@ -21,6 +21,12 @@ RUN VITE_VERSION=$VERSION \
     VITE_IS_RELEASE=$IS_RELEASE \
     bun run build
 
+# Bun runtime for yt-dlp's YouTube JS challenge solver. Baked into the final
+# image (not fetched at boot): every download may need it, and a silent
+# first-boot fetch failure would break format resolution. Musl build; the
+# final image installs libstdc++ (bun links it dynamically).
+FROM oven/bun:1.4.2-alpine AS bun-bin
+
 # Install Python dependencies
 FROM ghcr.io/astral-sh/uv:python3.12-alpine AS python-builder
 
@@ -38,16 +44,19 @@ WORKDIR /app
 
 # Install runtime dependencies, then create the non-root user.
 #
-# ffmpeg, bun, and rsgain are NOT baked in here — entrypoint.sh installs
-# them under /app/config/ (a persistent volume mount) on first boot instead.
+# ffmpeg and rsgain are NOT baked in here — entrypoint.sh installs them
+# under /app/config/ (a persistent volume mount) on first boot instead.
 # That trades a slower first start for a much smaller image:
-#   - ffmpeg/bun are 80MB+ static binaries each, bigger than everything
-#     else in this image combined.
+#   - ffmpeg is an 80MB+ static binary, bigger than everything else in
+#     this image combined.
 #   - rsgain ships only a glibc-dynamically-linked Linux release (its
 #     "static" build still links glibc), which cannot run on this image's
 #     musl libc, and its Alpine package transitively pulls in a full shared
 #     ffmpeg (~90MB). entrypoint.sh installs rsgain via apk into a
 #     persistent root under /app/config — musl-native, x86_64 and arm64.
+# bun (yt-dlp's JS challenge runtime) IS baked in: every download may need
+# it, and a failed first-boot fetch would silently break format resolution.
+# libstdc++ is a runtime dependency of bun's musl build.
 # curl/tar/xz/unzip stay installed (not removed after) because
 # entrypoint.sh needs them at runtime to do these fetches.
 RUN set -eux \
@@ -61,6 +70,7 @@ RUN set -eux \
 # Copy built artifacts
 COPY --from=python-builder --chown=yubal:yubal /app/.venv /app/.venv
 COPY --from=web-builder --chown=yubal:yubal /app/web/dist ./web/dist
+COPY --from=bun-bin /usr/local/bin/bun /usr/local/bin/bun
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
