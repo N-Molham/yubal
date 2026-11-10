@@ -1,72 +1,78 @@
+## [Unreleased]
+
+### 📚 Documentation
+
+- Add generated changelog by @N-Molham
+
 ## [0.12.0] - 2026-11-10
 
 ### 🚀 Features
 
-- _(db)_ Add subscription origin and runtime settings store
-- _(yubal)_ Expose library playlist discovery via YTMusic client
-- _(api)_ Add runtime library-sync settings
-- _(api)_ Track subscription origin and editable max items
-- _(api)_ Discover liked music and saved playlists
-- _(api)_ Wire library auto-sync into scheduler and API
-- _(web)_ Add library sync settings page
-- _(api)_ Expose runtime settings for jobs and scheduler
-- _(web)_ Expand settings page to all runtime options
+- _(db)_ Add subscription origin and runtime settings store by @N-Molham
+- _(yubal)_ Expose library playlist discovery via YTMusic client by @N-Molham
+- _(api)_ Add runtime library-sync settings by @N-Molham
+- _(api)_ Track subscription origin and editable max items by @N-Molham
+- _(api)_ Discover liked music and saved playlists by @N-Molham
+- _(api)_ Wire library auto-sync into scheduler and API by @N-Molham
+- _(web)_ Add library sync settings page by @N-Molham
+- _(api)_ Expose runtime settings for jobs and scheduler by @N-Molham
+- _(web)_ Expand settings page to all runtime options by @N-Molham
 
 ### 🐛 Bug Fixes
 
-- _(api)_ Probe auth before discovering library content
-- _(yubal)_ Fall back to broader yt-dlp formats when unavailable
-- _(yubal)_ Try alternate clients before video+audio fallback
-- Use musl bun as yt-dlp JS runtime instead of glibc deno
-- Install libstdc++ so bun JS runtime can execute
-- Prefer baked bun over stale config-volume copy
+- _(api)_ Probe auth before discovering library content by @N-Molham
+- _(yubal)_ Fall back to broader yt-dlp formats when unavailable by @N-Molham
+- _(yubal)_ Try alternate clients before video+audio fallback by @N-Molham
+- Use musl bun as yt-dlp JS runtime instead of glibc deno by @N-Molham
+- Install libstdc++ so bun JS runtime can execute by @N-Molham
+- Prefer baked bun over stale config-volume copy by @N-Molham
 
 ### 💼 Other
 
-- Bake bun into the runtime image
+- Bake bun into the runtime image by @N-Molham
 
 ### 📚 Documentation
 
-- Document library auto-sync
-- Document settings page precedence
+- Document library auto-sync by @N-Molham
+- Document settings page precedence by @N-Molham
 
 ### ⚙️ Miscellaneous Tasks
 
-- Drop upstream attribution from release notes
-- Bump mise-action to v4.3.0
-- Bump version to 0.12.0
+- Drop upstream attribution from release notes by @N-Molham
+- Bump mise-action to v4.3.0 by @N-Molham
+- Bump version to 0.12.0 by @N-Molham
 
 ## [0.11.1] - 2026-11-09
 
 ### 🐛 Bug Fixes
 
 - Bump yt-dlp to resolve YouTube 403 errors by @guillevc
-- Bump certifi and urllib3 for known vulnerabilities
-- Treat one-track playlists as single-track downloads
+- Bump certifi and urllib3 for known vulnerabilities by @N-Molham
+- Treat one-track playlists as single-track downloads by @N-Molham
 
 ### ⚙️ Miscellaneous Tasks
 
-- Run workflows manually only
-- Bump version to 0.11.1
+- Run workflows manually only by @N-Molham
+- Bump version to 0.11.1 by @N-Molham
 
 ## [0.11.0] - 2026-09-07
 
 ### 🚀 Features
 
-- Expose per-job UGC/non-music download override
-- Add SoundCloud provider for tracks, sets, and likes
-- Add source platform field and badge
-- Add podcast classification for plain YouTube content
+- Expose per-job UGC/non-music download override by @N-Molham
+- Add SoundCloud provider for tracks, sets, and likes by @N-Molham
+- Add source platform field and badge by @N-Molham
+- Add podcast classification for plain YouTube content by @N-Molham
 
 ### 🐛 Bug Fixes
 
-- _(deploy)_ Fix multi-arch build failures on ghcr.io push
-- _(docker)_ Install musl-native rsgain via apk
+- _(deploy)_ Fix multi-arch build failures on ghcr.io push by @N-Molham
+- _(docker)_ Install musl-native rsgain via apk by @N-Molham
 
 ### 🚜 Refactor
 
-- Introduce source provider abstraction
-- Stop hand-syncing YouTube-only URL allowlists
+- Introduce source provider abstraction by @N-Molham
+- Stop hand-syncing YouTube-only URL allowlists by @N-Molham
 
 ### 📚 Documentation
 
@@ -74,11 +80,11 @@
 
 ### ⚡ Performance
 
-- Shrink docker image 474MB -> 139MB (71%)
+- Shrink docker image 474MB -> 139MB (71%) by @N-Molham
 
 ### ⚙️ Miscellaneous Tasks
 
-- Bump version to 0.11.0
+- Bump version to 0.11.0 by @N-Molham
 
 ## [0.10.0] - 2026-08-18
 

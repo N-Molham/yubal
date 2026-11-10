@@ -19,7 +19,7 @@ body = """
 trim = true
 
 [remote.github]
-owner = "guillevc"
+owner = "N-Molham"
 repo = "yubal"
 
 [git]
