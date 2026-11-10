@@ -125,11 +125,32 @@ class YTDLPDownloader:
             "bestvideo*+bestaudio/best",
         ]
 
+    def _download_plan(self) -> list[tuple[str, str | None]]:
+        """Ordered (format, player_client) attempts.
+
+        Client fallbacks come first because they only change the API client;
+        downloading a video stream and extracting audio is the expensive last
+        resort. YouTube varies format availability by client (and by IP): the
+        default clients can return no downloadable formats, while
+        ``android_vr``/``android_music``/``tv_embedded`` still expose a muxed
+        format that FFmpeg can extract audio from.
+        """
+        selectors = self._format_selectors()
+        return [
+            (selectors[0], None),
+            (selectors[1], None),
+            ("bestaudio/best", "android_vr"),
+            ("bestaudio/best", "android_music"),
+            ("bestaudio/best", "tv_embedded"),
+            (selectors[2], None),
+        ]
+
     def _build_yt_dlp_options(
         self,
         output_path: Path,
         cookies_override: Path | None = None,
         format_selector: str | None = None,
+        player_client: str | None = None,
     ) -> dict[str, Any]:
         """Build yt-dlp options for audio extraction and post-processing.
 
@@ -173,6 +194,9 @@ class YTDLPDownloader:
         cookies = cookies_override or self._cookies_path
         if cookies and cookies.exists():
             opts["cookiefile"] = str(cookies)
+
+        if player_client:
+            opts["extractor_args"] = {"youtube": {"player_client": [player_client]}}
 
         return opts
 
@@ -231,12 +255,8 @@ class YTDLPDownloader:
             shutil.copy2(self._cookies_path, temp_cookies)
 
         try:
-            selectors = self._format_selectors()
-            selector_index = 0
-            opts = self._build_yt_dlp_options(
-                output_path, temp_cookies, selectors[selector_index]
-            )
             url = self._provider.resolve_download_url(video_id)
+            plan = self._download_plan()
 
             logger.debug("Downloading %s to %s", video_id, output_path)
 
@@ -255,13 +275,19 @@ class YTDLPDownloader:
                 if cancel_token and cancel_token.is_cancelled:
                     raise DownloadCancelled("Download cancelled")
 
-            opts["progress_hooks"] = [_cancel_hook]
-            opts["postprocessor_hooks"] = [
-                capture_postprocessed_path,
-                _cancel_hook,
-            ]
+            plan_index = 0
+            transient_attempt = 0
+            while plan_index < len(plan):
+                selector, player_client = plan[plan_index]
+                opts = self._build_yt_dlp_options(
+                    output_path, temp_cookies, selector, player_client
+                )
+                opts["progress_hooks"] = [_cancel_hook]
+                opts["postprocessor_hooks"] = [
+                    capture_postprocessed_path,
+                    _cancel_hook,
+                ]
 
-            for attempt in range(self.MAX_RETRIES + 1):
                 try:
                     with yt_dlp.YoutubeDL(opts) as ydl:
                         ydl.download([url])
@@ -291,31 +317,34 @@ class YTDLPDownloader:
                             "Try providing a cookies.txt file."
                         ) from e
 
-                    # Requested formats can be missing on some videos (e.g.
-                    # audio-only formats not exposed for this client). Fall
-                    # back to progressively more permissive selectors before
-                    # failing the track.
+                    # Some videos expose no usable formats for the current
+                    # client/IP. Try the next selector, then alternate player
+                    # clients, before failing.
                     if "Requested format is not available" in error_msg:
-                        if selector_index + 1 < len(selectors):
-                            selector_index += 1
-                            opts["format"] = selectors[selector_index]
-                            self._cleanup_partial_downloads(output_path)
+                        plan_index += 1
+                        transient_attempt = 0
+                        self._cleanup_partial_downloads(output_path)
+                        if plan_index < len(plan):
+                            next_selector, next_client = plan[plan_index]
+                            suffix = f" (client: {next_client})" if next_client else ""
                             logger.warning(
-                                "Format unavailable for %s; retrying with '%s'",
+                                "Format unavailable for %s; retrying with '%s'%s",
                                 video_id,
-                                selectors[selector_index],
+                                next_selector,
+                                suffix,
                             )
-                            continue
+                        continue
 
                     # Retryable transient errors (403, 429, 5xx)
                     if self._is_retryable_error(error_msg):
-                        if attempt < self.MAX_RETRIES:
-                            delay = self.RETRY_BASE_DELAY * (2**attempt)
+                        if transient_attempt < self.MAX_RETRIES:
+                            delay = self.RETRY_BASE_DELAY * (2**transient_attempt)
+                            transient_attempt += 1
                             logger.warning(
                                 "Transient error downloading %s (attempt %d/%d), "
                                 "retrying in %.1fs: %s",
                                 video_id,
-                                attempt + 1,
+                                transient_attempt,
                                 self.MAX_RETRIES + 1,
                                 delay,
                                 error_msg,
@@ -338,6 +367,11 @@ class YTDLPDownloader:
                     # Other errors - fail immediately
                     logger.exception("Failed to download %s: %s", video_id, e)
                     raise DownloadError(f"Failed to download {video_id}: {e}") from e
+            else:
+                raise DownloadError(
+                    f"Failed to download {video_id}: no downloadable format "
+                    "available for any selector or player client"
+                )
         finally:
             if temp_cookies is not None:
                 temp_cookies.unlink(missing_ok=True)

@@ -683,7 +683,7 @@ class TestYTDLPDownloaderRetry:
         def mock_download(urls: list[str]) -> None:
             nonlocal call_count
             call_count += 1
-            if call_count < 3:
+            if call_count < len(downloader._download_plan()):
                 raise Exception("Requested format is not available")
             output_path.parent.mkdir(parents=True, exist_ok=True)
             Path(f"{output_path}.opus").touch()
@@ -706,10 +706,50 @@ class TestYTDLPDownloaderRetry:
 
         assert formats[-1] == "bestvideo*+bestaudio/best"
 
+    def test_falls_back_to_alternate_player_client(
+        self, download_config: DownloadConfig, tmp_path: Path
+    ) -> None:
+        """Should retry with android_vr when no selector yields a format."""
+        downloader = YTDLPDownloader(download_config)
+        output_path = tmp_path / "test_track"
+        clients: list[list[str] | None] = []
+        call_count = 0
+
+        def mock_download(urls: list[str]) -> None:
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise Exception("Requested format is not available")
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            Path(f"{output_path}.opus").touch()
+
+        class FakeYDL:
+            def __init__(self, opts: dict) -> None:
+                clients.append(
+                    opts.get("extractor_args", {})
+                    .get("youtube", {})
+                    .get("player_client")
+                )
+
+            def __enter__(self) -> "FakeYDL":
+                return self
+
+            def __exit__(self, *args: object) -> bool:
+                return False
+
+            def download(self, urls: list[str]) -> None:
+                mock_download(urls)
+
+        with patch("yt_dlp.YoutubeDL", FakeYDL):
+            downloader.download("test_video_id", output_path)
+
+        assert clients[0] is None
+        assert clients[2] == ["android_vr"]
+
     def test_format_unavailable_exhausts_fallbacks(
         self, download_config: DownloadConfig, tmp_path: Path
     ) -> None:
-        """Should fail after all format selectors are exhausted."""
+        """Should fail after all format/client attempts are exhausted."""
         downloader = YTDLPDownloader(download_config)
         output_path = tmp_path / "test_track"
         call_count = 0
@@ -726,7 +766,7 @@ class TestYTDLPDownloaderRetry:
             with pytest.raises(DownloadError):
                 downloader.download("test_video_id", output_path)
 
-        assert call_count == 3  # One per selector; no transient retry loop
+        assert call_count == len(downloader._download_plan())
 
     def test_no_retry_for_video_unavailable(
         self, download_config: DownloadConfig, tmp_path: Path
