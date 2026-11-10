@@ -208,17 +208,23 @@ class YTDLPDownloader:
     def _js_runtime_options(self) -> dict[str, Any]:
         """Prefer a JS runtime that actually runs on this image's libc.
 
-        Bun is the musl-native runtime the container fetches; node/deno cover
-        local dev. Only the first *working* runtime is passed, so yt-dlp never
-        tries a broken glibc deno or a bun missing libstdc++.
+        Bun is baked at ``/usr/local/bin/bun``; a stale copy in the config
+        volume can shadow it on PATH, so try the baked path first. node/deno
+        cover local dev. Only the first *working* runtime is passed, so yt-dlp
+        never tries a broken glibc deno or a bun missing libstdc++.
         """
         if self._js_runtime_checked:
             return self._js_runtime or {}
 
         self._js_runtime_checked = True
+        candidates: list[tuple[str, str]] = []
         for name in ("bun", "node", "deno"):
-            path = shutil.which(name)
-            if path and self._runtime_works(path):
+            for path in (f"/usr/local/bin/{name}", shutil.which(name)):
+                if path and all(existing != path for _, existing in candidates):
+                    candidates.append((name, path))
+
+        for name, path in candidates:
+            if self._runtime_works(path):
                 self._js_runtime = {"js_runtimes": {name: {"path": path}}}
                 break
         return self._js_runtime or {}

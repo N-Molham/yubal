@@ -607,11 +607,38 @@ class TestJsRuntimeOptions:
                 "yubal.services.download_service.shutil.which",
                 side_effect=lambda name: "/usr/bin/node" if name == "node" else None,
             ),
-            patch.object(YTDLPDownloader, "_runtime_works", return_value=True),
+            patch.object(
+                YTDLPDownloader,
+                "_runtime_works",
+                side_effect=lambda path: path == "/usr/bin/node",
+            ),
         ):
             opts = downloader._build_yt_dlp_options(tmp_path / "track")
 
         assert opts["js_runtimes"] == {"node": {"path": "/usr/bin/node"}}
+
+    def test_baked_bun_wins_over_stale_volume_copy(
+        self, download_config: DownloadConfig, tmp_path: Path
+    ) -> None:
+        """A broken bun in the config volume must not shadow the baked one."""
+        downloader = YTDLPDownloader(download_config)
+
+        with (
+            patch(
+                "yubal.services.download_service.shutil.which",
+                side_effect=lambda name: (
+                    "/app/config/bin/bun" if name == "bun" else None
+                ),
+            ),
+            patch.object(
+                YTDLPDownloader,
+                "_runtime_works",
+                side_effect=lambda path: path == "/usr/local/bin/bun",
+            ),
+        ):
+            opts = downloader._build_yt_dlp_options(tmp_path / "track")
+
+        assert opts["js_runtimes"] == {"bun": {"path": "/usr/local/bin/bun"}}
 
     def test_skips_runtime_that_cannot_execute(
         self, download_config: DownloadConfig, tmp_path: Path
@@ -642,7 +669,10 @@ class TestJsRuntimeOptions:
     ) -> None:
         downloader = YTDLPDownloader(download_config)
 
-        with patch("yubal.services.download_service.shutil.which", return_value=None):
+        with (
+            patch("yubal.services.download_service.shutil.which", return_value=None),
+            patch.object(YTDLPDownloader, "_runtime_works", return_value=False),
+        ):
             opts = downloader._build_yt_dlp_options(tmp_path / "track")
 
         assert "js_runtimes" not in opts

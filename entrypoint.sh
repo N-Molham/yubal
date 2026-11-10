@@ -103,6 +103,10 @@ if [ "$(id -u)" = "0" ]; then
     # Create required directories
     mkdir -p /app/config/yubal /app/config/ytdlp "$BIN_DIR" /app/data
 
+    # Legacy fetched runtimes are now baked into the image; remove stale
+    # copies from the config volume so they cannot shadow the baked bun.
+    rm -f "$BIN_DIR/bun" "$BIN_DIR/deno"
+
     # Non-fatal: a network hiccup on first boot shouldn't crash-loop the
     # container. Downloads needing the missing binary will just fail with a
     # clear error until it fetches successfully on a later boot.
@@ -119,6 +123,7 @@ fi
 
 # Non-root: still create dirs if possible, then exec
 mkdir -p /app/config/yubal /app/config/ytdlp "$BIN_DIR" /app/data 2>/dev/null || true
+rm -f "$BIN_DIR/bun" "$BIN_DIR/deno" 2>/dev/null || true
 fetch_ffmpeg_if_missing || true
 install_rsgain_if_missing || true
 exec "$@"
