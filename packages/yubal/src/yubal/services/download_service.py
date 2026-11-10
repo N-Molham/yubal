@@ -198,7 +198,23 @@ class YTDLPDownloader:
         if player_client:
             opts["extractor_args"] = {"youtube": {"player_client": [player_client]}}
 
+        opts.update(self._js_runtime_options())
+
         return opts
+
+    @staticmethod
+    def _js_runtime_options() -> dict[str, Any]:
+        """Prefer a JS runtime that actually runs on this image's libc.
+
+        Bun is the musl-native runtime the container fetches; node/deno cover
+        local dev. Only the first available runtime is passed, so yt-dlp never
+        tries the broken glibc deno binary on Alpine.
+        """
+        for name in ("bun", "node", "deno"):
+            path = shutil.which(name)
+            if path:
+                return {"js_runtimes": {name: {"path": path}}}
+        return {}
 
     def _is_retryable_error(self, error_msg: str) -> bool:
         """Check if the error is a retryable transient HTTP error."""

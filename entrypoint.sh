@@ -21,7 +21,7 @@ ensure_writable() {
     fi
 }
 
-# ffmpeg/deno are fetched here instead of baked into the image (see
+# ffmpeg/bun are fetched here instead of baked into the image (see
 # Dockerfile) — both are 80MB+ static binaries, bigger than everything else
 # in the image combined. Cached in /app/config/bin/, a persistent volume
 # mount, so this only costs time on the very first boot; every boot after
@@ -57,33 +57,42 @@ fetch_ffmpeg_if_missing() {
 
 # Only used by yt-dlp to solve YouTube's JS anti-bot challenges — downloads
 # are not otherwise affected if this fetch fails (best-effort, non-fatal).
-fetch_deno_if_missing() {
-    if [ -x "$BIN_DIR/deno" ]; then
+# Bun's musl build runs on Alpine; deno only ships a glibc Linux build, which
+# cannot exec on this image (the old fetch silently produced a broken binary).
+fetch_bun_if_missing() {
+    if [ -x "$BIN_DIR/bun" ]; then
         return 0
     fi
 
     local arch
     case "$(uname -m)" in
-        x86_64) arch=x86_64 ;;
+        x86_64) arch=x64 ;;
         aarch64 | arm64) arch=aarch64 ;;
         *)
-            echo "Warning: unsupported architecture '$(uname -m)' for deno fetch, skipping." >&2
+            echo "Warning: unsupported architecture '$(uname -m)' for bun fetch, skipping." >&2
             return 0
             ;;
     esac
 
-    echo "Fetching deno (first boot only, cached in $BIN_DIR)..."
-    local tmp=/tmp/deno.zip
+    # Keep in sync with .bun-version (used for the frontend build).
+    local version=1.4.2
+    echo "Fetching bun (first boot only, cached in $BIN_DIR)..."
+    local tmp=/tmp/bun.zip
     if ! curl -fsSL --retry 3 --retry-delay 5 -o "$tmp" \
-        "https://github.com/denoland/deno/releases/latest/download/deno-${arch}-unknown-linux-gnu.zip"; then
-        echo "Warning: failed to download deno. YouTube JS-challenge solving will be" >&2
+        "https://github.com/oven-sh/bun/releases/download/bun-v${version}/bun-linux-${arch}-musl.zip"; then
+        echo "Warning: failed to download bun. YouTube JS-challenge solving will be" >&2
         echo "unavailable until this succeeds on a later boot; regular downloads are unaffected." >&2
         return 0
     fi
-    unzip -oq "$tmp" -d "$BIN_DIR"
-    rm -f "$tmp"
-    chmod +x "$BIN_DIR/deno"
-    echo "deno fetched."
+
+    local extract=/tmp/bun-extract
+    rm -rf "$extract"
+    mkdir -p "$extract"
+    unzip -oq "$tmp" -d "$extract"
+    mv "$extract/bun-linux-${arch}-musl/bun" "$BIN_DIR/bun"
+    rm -rf "$extract" "$tmp"
+    chmod +x "$BIN_DIR/bun"
+    echo "bun fetched."
 }
 
 # Only used for ReplayGain tagging — downloads are not otherwise affected if
@@ -138,7 +147,7 @@ if [ "$(id -u)" = "0" ]; then
     # container. Downloads needing the missing binary will just fail with a
     # clear error until it fetches successfully on a later boot.
     fetch_ffmpeg_if_missing || true
-    fetch_deno_if_missing || true
+    fetch_bun_if_missing || true
     install_rsgain_if_missing || true
 
     # Fix ownership (non-recursive on /app/data to avoid slow startup with large libraries)

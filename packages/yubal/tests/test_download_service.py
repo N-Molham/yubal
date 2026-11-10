@@ -578,6 +578,44 @@ class TestDownloadConfig:
             config.codec = AudioCodec.MP3  # type: ignore
 
 
+class TestJsRuntimeOptions:
+    """yt-dlp should use a runtime that runs on the image's libc."""
+
+    def test_prefers_bun(self, download_config: DownloadConfig, tmp_path: Path) -> None:
+        downloader = YTDLPDownloader(download_config)
+
+        with patch(
+            "yubal.services.download_service.shutil.which",
+            side_effect=lambda name: "/usr/local/bin/bun" if name == "bun" else None,
+        ):
+            opts = downloader._build_yt_dlp_options(tmp_path / "track")
+
+        assert opts["js_runtimes"] == {"bun": {"path": "/usr/local/bin/bun"}}
+
+    def test_falls_back_to_node(
+        self, download_config: DownloadConfig, tmp_path: Path
+    ) -> None:
+        downloader = YTDLPDownloader(download_config)
+
+        with patch(
+            "yubal.services.download_service.shutil.which",
+            side_effect=lambda name: "/usr/bin/node" if name == "node" else None,
+        ):
+            opts = downloader._build_yt_dlp_options(tmp_path / "track")
+
+        assert opts["js_runtimes"] == {"node": {"path": "/usr/bin/node"}}
+
+    def test_omits_runtime_when_none_found(
+        self, download_config: DownloadConfig, tmp_path: Path
+    ) -> None:
+        downloader = YTDLPDownloader(download_config)
+
+        with patch("yubal.services.download_service.shutil.which", return_value=None):
+            opts = downloader._build_yt_dlp_options(tmp_path / "track")
+
+        assert "js_runtimes" not in opts
+
+
 class TestYTDLPDownloaderRetry:
     """Tests for YTDLPDownloader retry behavior."""
 

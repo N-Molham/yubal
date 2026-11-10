@@ -38,10 +38,10 @@ WORKDIR /app
 
 # Install runtime dependencies, then create the non-root user.
 #
-# ffmpeg, deno, and rsgain are NOT baked in here — entrypoint.sh installs
+# ffmpeg, bun, and rsgain are NOT baked in here — entrypoint.sh installs
 # them under /app/config/ (a persistent volume mount) on first boot instead.
 # That trades a slower first start for a much smaller image:
-#   - ffmpeg/deno are 80MB+ static binaries each, bigger than everything
+#   - ffmpeg/bun are 80MB+ static binaries each, bigger than everything
 #     else in this image combined.
 #   - rsgain ships only a glibc-dynamically-linked Linux release (its
 #     "static" build still links glibc), which cannot run on this image's
