@@ -52,7 +52,7 @@ WORKDIR /app
 # entrypoint.sh needs them at runtime to do these fetches.
 RUN set -eux \
     # bash: entrypoint.sh's shebang. su-exec: gosu-equivalent, Alpine-native.
-    && apk add --no-cache curl tar xz unzip ca-certificates bash su-exec \
+    && apk add --no-cache curl tar xz unzip ca-certificates bash su-exec libstdc++ \
     #
     # --- Non-root user (Alpine's busybox addgroup/adduser, not groupadd/useradd) ---
     && addgroup -g 1000 yubal \

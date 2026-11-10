@@ -584,9 +584,14 @@ class TestJsRuntimeOptions:
     def test_prefers_bun(self, download_config: DownloadConfig, tmp_path: Path) -> None:
         downloader = YTDLPDownloader(download_config)
 
-        with patch(
-            "yubal.services.download_service.shutil.which",
-            side_effect=lambda name: "/usr/local/bin/bun" if name == "bun" else None,
+        with (
+            patch(
+                "yubal.services.download_service.shutil.which",
+                side_effect=lambda name: (
+                    "/usr/local/bin/bun" if name == "bun" else None
+                ),
+            ),
+            patch.object(YTDLPDownloader, "_runtime_works", return_value=True),
         ):
             opts = downloader._build_yt_dlp_options(tmp_path / "track")
 
@@ -597,9 +602,36 @@ class TestJsRuntimeOptions:
     ) -> None:
         downloader = YTDLPDownloader(download_config)
 
-        with patch(
-            "yubal.services.download_service.shutil.which",
-            side_effect=lambda name: "/usr/bin/node" if name == "node" else None,
+        with (
+            patch(
+                "yubal.services.download_service.shutil.which",
+                side_effect=lambda name: "/usr/bin/node" if name == "node" else None,
+            ),
+            patch.object(YTDLPDownloader, "_runtime_works", return_value=True),
+        ):
+            opts = downloader._build_yt_dlp_options(tmp_path / "track")
+
+        assert opts["js_runtimes"] == {"node": {"path": "/usr/bin/node"}}
+
+    def test_skips_runtime_that_cannot_execute(
+        self, download_config: DownloadConfig, tmp_path: Path
+    ) -> None:
+        """A broken glibc/missing-lib binary must not be handed to yt-dlp."""
+        downloader = YTDLPDownloader(download_config)
+
+        with (
+            patch(
+                "yubal.services.download_service.shutil.which",
+                side_effect=lambda name: {
+                    "bun": "/app/config/bin/bun",
+                    "node": "/usr/bin/node",
+                }.get(name),
+            ),
+            patch.object(
+                YTDLPDownloader,
+                "_runtime_works",
+                side_effect=lambda path: path == "/usr/bin/node",
+            ),
         ):
             opts = downloader._build_yt_dlp_options(tmp_path / "track")
 

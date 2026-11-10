@@ -92,6 +92,9 @@ fetch_bun_if_missing() {
     mv "$extract/bun-linux-${arch}-musl/bun" "$BIN_DIR/bun"
     rm -rf "$extract" "$tmp"
     chmod +x "$BIN_DIR/bun"
+    if ! "$BIN_DIR/bun" --version >/dev/null 2>&1; then
+        echo "Warning: bun fetched but cannot run (missing libstdc++?)." >&2
+    fi
     echo "bun fetched."
 }
 

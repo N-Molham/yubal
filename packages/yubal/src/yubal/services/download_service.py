@@ -3,6 +3,7 @@
 import logging
 import os
 import shutil
+import subprocess
 import tempfile
 import time
 from collections.abc import Iterator
@@ -106,6 +107,8 @@ class YTDLPDownloader:
         self._config = config
         self._cookies_path = cookies_path
         self._provider = provider or YouTubeMusicProvider()
+        self._js_runtime: dict[str, Any] | None = None
+        self._js_runtime_checked = False
 
         if cookies_path and cookies_path.exists():
             logger.info("Using cookies for yt-dlp downloads")
@@ -202,19 +205,37 @@ class YTDLPDownloader:
 
         return opts
 
-    @staticmethod
-    def _js_runtime_options() -> dict[str, Any]:
+    def _js_runtime_options(self) -> dict[str, Any]:
         """Prefer a JS runtime that actually runs on this image's libc.
 
         Bun is the musl-native runtime the container fetches; node/deno cover
-        local dev. Only the first available runtime is passed, so yt-dlp never
-        tries the broken glibc deno binary on Alpine.
+        local dev. Only the first *working* runtime is passed, so yt-dlp never
+        tries a broken glibc deno or a bun missing libstdc++.
         """
+        if self._js_runtime_checked:
+            return self._js_runtime or {}
+
+        self._js_runtime_checked = True
         for name in ("bun", "node", "deno"):
             path = shutil.which(name)
-            if path:
-                return {"js_runtimes": {name: {"path": path}}}
-        return {}
+            if path and self._runtime_works(path):
+                self._js_runtime = {"js_runtimes": {name: {"path": path}}}
+                break
+        return self._js_runtime or {}
+
+    @staticmethod
+    def _runtime_works(path: str) -> bool:
+        """Check the runtime actually executes (missing libs, wrong libc)."""
+        try:
+            result = subprocess.run(
+                [path, "--version"],
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return result.returncode == 0
 
     def _is_retryable_error(self, error_msg: str) -> bool:
         """Check if the error is a retryable transient HTTP error."""
